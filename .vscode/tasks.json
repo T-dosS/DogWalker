@@ -1,0 +1,153 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "DogWalker: compilar",
+            "type": "process",
+            "command": "gcc",
+            "args": [
+                "-std=c11",
+                "-Wall",
+                "-Wextra",
+                "-Wpedantic",
+                "-Wshadow",
+                "-g",
+                "-Iinclude",
+                "src/main.c",
+                "src/arquivo.c",
+                "src/cliente.c",
+                "src/login.c",
+                "src/menu.c",
+                "src/terminal.c",
+                "src/validacao.c",
+                "-o",
+                "dogwalker"
+            ],
+            "windows": {
+                "args": [
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Wpedantic",
+                    "-Wshadow",
+                    "-g",
+                    "-Iinclude",
+                    "src/main.c",
+                    "src/arquivo.c",
+                    "src/cliente.c",
+                    "src/login.c",
+                    "src/menu.c",
+                    "src/terminal.c",
+                    "src/validacao.c",
+                    "-o",
+                    "dogwalker.exe"
+                ]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        },
+        {
+            "label": "DogWalker: executar",
+            "detail": "Compila e abre o programa no terminal (digite as respostas nele)",
+            "type": "process",
+            "command": "${workspaceFolder}/dogwalker",
+            "windows": {
+                "command": "${workspaceFolder}\\dogwalker.exe"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "DogWalker: compilar",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "DogWalker: compilar testes",
+            "type": "process",
+            "command": "gcc",
+            "args": [
+                "-std=c11",
+                "-Wall",
+                "-Wextra",
+                "-Wpedantic",
+                "-Wshadow",
+                "-g",
+                "-Iinclude",
+                "tests/test_dogwalker.c",
+                "src/arquivo.c",
+                "src/cliente.c",
+                "src/login.c",
+                "src/menu.c",
+                "src/terminal.c",
+                "src/validacao.c",
+                "-o",
+                "test_dogwalker"
+            ],
+            "windows": {
+                "args": [
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Wpedantic",
+                    "-Wshadow",
+                    "-g",
+                    "-Iinclude",
+                    "tests/test_dogwalker.c",
+                    "src/arquivo.c",
+                    "src/cliente.c",
+                    "src/login.c",
+                    "src/menu.c",
+                    "src/terminal.c",
+                    "src/validacao.c",
+                    "-o",
+                    "test_dogwalker.exe"
+                ]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "DogWalker: testar",
+            "detail": "Compila e executa os testes automatizados",
+            "type": "process",
+            "command": "${workspaceFolder}/test_dogwalker",
+            "windows": {
+                "command": "${workspaceFolder}\\test_dogwalker.exe"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "DogWalker: compilar testes",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        }
+    ]
+}

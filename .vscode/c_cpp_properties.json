@@ -1,0 +1,13 @@
+{
+  "configurations": [
+    {
+      "name": "DogWalker",
+      "includePath": [
+        "${workspaceFolder}/include"
+      ],
+      "cStandard": "c11",
+      "intelliSenseMode": "${default}"
+    }
+  ],
+  "version": 4
+}

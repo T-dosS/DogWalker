@@ -1,0 +1,40 @@
+{
+    // Depuração com F5 (requer a extensão C/C++ da Microsoft e o gdb,
+    // que já vem junto com o MinGW-w64/WinLibs).
+    // externalConsole = true abre uma janela de console própria, necessária
+    // para digitar login e opções do menu enquanto depura no Windows.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "DogWalker: depurar",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/dogwalker",
+            "windows": { "program": "${workspaceFolder}\\dogwalker.exe" },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "preLaunchTask": "DogWalker: compilar",
+            "setupCommands": [
+                { "description": "Formatação legível de variáveis", "text": "-enable-pretty-printing", "ignoreFailures": true }
+            ]
+        },
+        {
+            "name": "DogWalker: depurar testes",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_dogwalker",
+            "windows": { "program": "${workspaceFolder}\\test_dogwalker.exe" },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb",
+            "preLaunchTask": "DogWalker: compilar testes"
+        }
+    ]
+}

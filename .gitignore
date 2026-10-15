@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------
+# Executáveis gerados
+# ---------------------------------------------------------------
+dogwalker
+test_dogwalker
+*.exe
+*.out
+*.app
+
+# ---------------------------------------------------------------
+# Arquivos intermediários de compilação
+# ---------------------------------------------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.pdb
+*.ilk
+*.d
+*.gch
+
+# Diretórios de build
+build/
+bin/
+obj/
+Debug/
+Release/
+
+# ---------------------------------------------------------------
+# DADOS PESSOAIS - nunca enviar para o GitHub
+# Os arquivos de clientes contêm nome, CPF, e-mail e endereço.
+# Apenas o arquivo de exemplo (com dados fictícios) é versionado.
+# ---------------------------------------------------------------
+data/*
+!data/.gitkeep
+!data/clientes_exemplo.csv
+*.tmp
+Dados_Clientes.txt
+
+# Arquivos temporários criados pelos testes
+teste_tmp_*.csv
+
+# ---------------------------------------------------------------
+# IDEs e editores
+# ---------------------------------------------------------------
+# .vscode: versiona só as configurações do projeto (compilar/executar/depurar)
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/c_cpp_properties.json
+!.vscode/extensions.json
+.idea/
+.vs/
+*.cbp
+*.layout
+*.depend
+*.dev
+*.swp
+*~
+
+# ---------------------------------------------------------------
+# Sistema operacional
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
