@@ -29,6 +29,7 @@ typedef enum {
 /**
  * Prepara o terminal: no Windows ativa UTF-8 para que acentos apareçam
  * corretamente. No Linux/macOS não é necessário fazer nada.
+ * (Cores e bordas ficam a cargo do módulo ui.)
  */
 void terminal_configurar(void);
 
@@ -53,21 +54,33 @@ ResultadoEntrada ler_linha(const char *rotulo, char *destino, size_t tamanho);
  */
 ResultadoEntrada ler_senha(const char *rotulo, char *destino, size_t tamanho);
 
-/**
- * Faz uma pergunta de sim/não e repete até receber uma resposta válida.
- * Aceita s/sim e n/nao/não, em maiúsculas ou minúsculas.
- *
- * @return 1 para sim, 0 para não e -1 se a entrada terminar.
- */
-int confirmar(const char *pergunta);
-
-/** Espera o usuário apertar ENTER antes de voltar ao menu. */
-void pausar(void);
-
 /** @return 1 se a entrada padrão terminou (EOF ou erro), 0 caso contrário. */
 int entrada_encerrada(void);
 
-/** Imprime um título de tela entre linhas de separação. */
-void imprimir_titulo(const char *titulo);
+/**
+ * @return 1 se a entrada vem de um teclado (console/terminal), 0 se foi
+ *         redirecionada de um arquivo ou pipe (ex.: testes automatizados).
+ */
+int terminal_interativo(void);
+
+/** Teclas reconhecidas na navegação dos menus. */
+typedef enum {
+    TECLA_NAV_CIMA,
+    TECLA_NAV_BAIXO,
+    TECLA_NAV_ENTER,
+    TECLA_NAV_ESC,
+    TECLA_NAV_CARACTERE, /**< tecla imprimível, devolvida em *caractere */
+    TECLA_NAV_OUTRA,     /**< tecla sem uso no menu (F1, Tab...)       */
+    TECLA_NAV_FIM        /**< Ctrl+C / Ctrl+Z / Ctrl+D ou sem teclado   */
+} TeclaNavegacao;
+
+/**
+ * Lê UMA tecla, sem esperar ENTER e sem eco, traduzindo as setas.
+ * As setas chegam como sequências diferentes no Windows (0xE0 + código)
+ * e no Linux/macOS (ESC [ A), e esta função esconde essa diferença.
+ *
+ * @param caractere recebe a tecla quando o retorno é TECLA_NAV_CARACTERE.
+ */
+TeclaNavegacao ler_tecla_navegacao(int *caractere);
 
 #endif /* TERMINAL_H */

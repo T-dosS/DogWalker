@@ -99,6 +99,17 @@ int lista_remover(ListaClientes *lista, size_t indice);
 /** @return 1 se todos os campos dos dois clientes forem iguais, 0 caso contrário. */
 int clientes_iguais(const Cliente *a, const Cliente *b);
 
+/**
+ * Verifica se o cliente corresponde a um termo de busca (filtro da listagem).
+ *
+ * O termo é procurado, sem diferenciar maiúsculas de minúsculas, no nome,
+ * e-mail, cidade e UF. Se o termo for só dígitos (com ou sem pontuação),
+ * também é procurado no CPF, para que "529.982" encontre "52998224725".
+ *
+ * @return 1 se corresponde (ou se o termo for vazio/NULL), 0 caso contrário.
+ */
+int cliente_corresponde(const Cliente *cliente, const char *termo);
+
 /** Mostra os dados do cliente no terminal, com CPF e CEP formatados. */
 void cliente_exibir(const Cliente *cliente);
 

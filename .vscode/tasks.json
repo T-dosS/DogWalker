@@ -18,7 +18,7 @@
                 "src/cliente.c",
                 "src/login.c",
                 "src/menu.c",
-                "src/terminal.c",
+                "src/terminal.c", "src/ui.c",
                 "src/validacao.c",
                 "-o",
                 "dogwalker"
@@ -37,7 +37,7 @@
                     "src/cliente.c",
                     "src/login.c",
                     "src/menu.c",
-                    "src/terminal.c",
+                    "src/terminal.c", "src/ui.c",
                     "src/validacao.c",
                     "-o",
                     "dogwalker.exe"
@@ -95,7 +95,7 @@
                 "src/cliente.c",
                 "src/login.c",
                 "src/menu.c",
-                "src/terminal.c",
+                "src/terminal.c", "src/ui.c",
                 "src/validacao.c",
                 "-o",
                 "test_dogwalker"
@@ -114,7 +114,7 @@
                     "src/cliente.c",
                     "src/login.c",
                     "src/menu.c",
-                    "src/terminal.c",
+                    "src/terminal.c", "src/ui.c",
                     "src/validacao.c",
                     "-o",
                     "test_dogwalker.exe"

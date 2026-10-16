@@ -11,33 +11,52 @@
  *
  * Trabalhar sempre a partir do arquivo mantém a tela e o disco
  * sincronizados e deixa cada operação simples de entender e testar.
+ *
+ * A aparência (cores, bordas, menu com setas) é responsabilidade de ui.c;
+ * este arquivo só decide O QUE mostrar.
  */
 #include "menu.h"
 #include "arquivo.h"
 #include "cliente.h"
 #include "terminal.h"
+#include "ui.h"
 #include "validacao.h"
 
 #include <stdio.h>
 #include <string.h>
 
-/* Os números das opções são os mesmos do trabalho original. */
+/* Opções na ordem em que aparecem no menu (índices de ITENS_MENU). */
 typedef enum {
-    OPCAO_CADASTRAR = 1,
-    OPCAO_ALTERAR   = 2,
-    OPCAO_LISTAR    = 3,
-    OPCAO_REMOVER   = 4,
-    OPCAO_ENCERRAR  = 5
+    OPCAO_CADASTRAR,
+    OPCAO_ALTERAR,
+    OPCAO_LISTAR,
+    OPCAO_REMOVER,
+    OPCAO_ENCERRAR,
+    TOTAL_OPCOES
 } OpcaoMenu;
+
+/* As teclas numéricas são as mesmas do trabalho original; as letras são
+ * atalhos novos (iniciais de cada ação). */
+static const UiItemMenu ITENS_MENU[TOTAL_OPCOES] = {
+    {'1', 'C', "Cadastrar cliente", "Inclui um novo cliente com validação de CPF, e-mail, UF e CEP."},
+    {'2', 'A', "Alterar cliente", "Busca pelo CPF e edita os dados. ENTER mantém o valor atual."},
+    {'3', 'L', "Listar clientes", "Tabela com todos os clientes e filtro por nome, cidade, CPF ou e-mail."},
+    {'4', 'R', "Remover cliente", "Busca pelo CPF, mostra os dados e pede confirmação antes de remover."},
+    {'5', 'S', "Encerrar", "Fecha o programa. Os dados já ficam salvos a cada operação."}
+};
 
 /** Assinatura comum das operações executadas sobre a lista de clientes. */
 typedef void (*Operacao)(ListaClientes *lista, const char *caminho);
 
 /* Mensagens de ajuda exibidas quando um campo é digitado incorretamente. */
-#define DICA_CPF   "    ! CPF inválido. Digite 11 dígitos, com ou sem pontuação (ex.: 529.982.247-25).\n"
-#define DICA_EMAIL "    ! E-mail inválido. Exemplo de formato aceito: nome@dominio.com\n"
-#define DICA_UF    "    ! Estado inválido. Use a sigla da UF com 2 letras (ex.: SP, RJ, MG).\n"
-#define DICA_CEP   "    ! CEP inválido. Digite 8 dígitos, com ou sem hífen (ex.: 01001-000).\n"
+#define DICA_CPF   "CPF inválido. Digite 11 dígitos, com ou sem pontuação (ex.: 529.982.247-25)."
+#define DICA_EMAIL "E-mail inválido. Exemplo de formato aceito: nome@dominio.com"
+#define DICA_UF    "Estado inválido. Use a sigla da UF com 2 letras (ex.: SP, RJ, MG)."
+#define DICA_CEP   "CEP inválido. Digite 8 dígitos, com ou sem hífen (ex.: 01001-000)."
+
+/* Colunas da tabela de clientes: #, Nome, CPF, Cidade/UF. */
+#define COLUNAS_TABELA 4
+static const size_t LARGURAS_TABELA[COLUNAS_TABELA] = {3, 27, 14, 20};
 
 /* ------------------------------------------------------------------ */
 /* Funções auxiliares de leitura                                       */
@@ -66,9 +85,12 @@ static int ler_campo(const char *nome_campo, Normalizador normalizar,
     char bruto[TAM_ENTRADA];
 
     if (permitir_manter) {
-        snprintf(rotulo, sizeof rotulo, "  %s [%s]: ", nome_campo, destino);
+        snprintf(rotulo, sizeof rotulo, "  %s%s%s %s[%s]%s: ", ui_codigo(UI_COR_ROTULO),
+                 nome_campo, ui_codigo(UI_COR_NORMAL), ui_codigo(UI_COR_SUAVE), destino,
+                 ui_codigo(UI_COR_NORMAL));
     } else {
-        snprintf(rotulo, sizeof rotulo, "  %s: ", nome_campo);
+        snprintf(rotulo, sizeof rotulo, "  %s%s%s: ", ui_codigo(UI_COR_ROTULO), nome_campo,
+                 ui_codigo(UI_COR_NORMAL));
     }
 
     for (;;) {
@@ -79,7 +101,7 @@ static int ler_campo(const char *nome_campo, Normalizador normalizar,
             if (permitir_manter) {
                 return 1; /* mantém o valor atual */
             }
-            printf("    ! Campo obrigatório.\n");
+            ui_erro("Campo obrigatório.");
             continue;
         case ENTRADA_LONGA:
             break; /* mostra a dica abaixo */
@@ -91,10 +113,10 @@ static int ler_campo(const char *nome_campo, Normalizador normalizar,
         }
 
         if (dica != NULL) {
-            printf("%s", dica);
+            ui_erro("%s", dica);
         } else {
-            printf("    ! Valor inválido. Use até %u caracteres e não utilize ';'.\n",
-                   (unsigned)(tamanho - 1));
+            ui_erro("Valor inválido. Use até %u caracteres e não utilize ';'.",
+                    (unsigned)(tamanho - 1));
         }
     }
 }
@@ -127,11 +149,15 @@ static int preencher_dados_cliente(Cliente *c, int alterando)
  */
 static int ler_cpf(char *cpf, size_t tamanho)
 {
+    char rotulo[TAM_ENTRADA];
     char bruto[TAM_ENTRADA];
 
+    snprintf(rotulo, sizeof rotulo, "  %sCPF%s %s(ENTER vazio para cancelar)%s: ",
+             ui_codigo(UI_COR_ROTULO), ui_codigo(UI_COR_NORMAL), ui_codigo(UI_COR_SUAVE),
+             ui_codigo(UI_COR_NORMAL));
+
     for (;;) {
-        ResultadoEntrada resultado =
-            ler_linha("  CPF (ENTER vazio para cancelar): ", bruto, sizeof bruto);
+        ResultadoEntrada resultado = ler_linha(rotulo, bruto, sizeof bruto);
 
         if (resultado == ENTRADA_FIM) {
             return -1;
@@ -142,13 +168,13 @@ static int ler_cpf(char *cpf, size_t tamanho)
         if (resultado == ENTRADA_OK && normalizar_cpf(bruto, cpf, tamanho)) {
             return 1;
         }
-        printf(DICA_CPF);
+        ui_erro(DICA_CPF);
     }
 }
 
 /**
  * Pede o CPF, procura o cliente e, se encontrar, exibe seus dados.
- * Usada pela alteração e pela remoção (antes, essa lógica não existia).
+ * Usada pela alteração e pela remoção.
  *
  * @return o índice do cliente na lista, ou -1 se cancelado/não encontrado.
  */
@@ -160,7 +186,8 @@ static int localizar_cliente(const ListaClientes *lista)
     int leitura = ler_cpf(cpf, sizeof cpf);
 
     if (leitura == 0) {
-        printf("\n  Operação cancelada.\n");
+        printf("\n");
+        ui_aviso("Operação cancelada.");
     }
     if (leitura <= 0) {
         return -1;
@@ -169,11 +196,14 @@ static int localizar_cliente(const ListaClientes *lista)
     indice = lista_buscar_cpf(lista, cpf);
     if (indice < 0) {
         formatar_cpf(cpf, cpf_formatado, sizeof cpf_formatado);
-        printf("\n  ! Nenhum cliente encontrado com o CPF %s.\n", cpf_formatado);
+        printf("\n");
+        ui_erro("Nenhum cliente encontrado com o CPF %s.", cpf_formatado);
         return -1;
     }
 
-    printf("\n  Cliente encontrado:\n\n");
+    printf("\n");
+    ui_info("Cliente encontrado:");
+    printf("\n");
     cliente_exibir(&lista->itens[indice]);
     return indice;
 }
@@ -188,13 +218,14 @@ static int carregar_clientes(const char *caminho, ListaClientes *lista)
     ResultadoArquivo resultado = arquivo_carregar(caminho, lista, &ignoradas);
 
     if (resultado != ARQUIVO_OK) {
-        printf("\n  ! Erro em '%s': %s.\n", caminho, arquivo_descrever_erro(resultado));
+        printf("\n");
+        ui_erro("Erro em '%s': %s.", caminho, arquivo_descrever_erro(resultado));
         return 0;
     }
     if (ignoradas > 0) {
-        printf("\n  ! Atenção: %u linha(s) inválida(s) de '%s' foram ignoradas.\n"
-               "    Elas serão descartadas na próxima gravação.\n",
-               (unsigned)ignoradas, caminho);
+        printf("\n");
+        ui_aviso("%u linha(s) inválida(s) de '%s' foram ignoradas e serão "
+                 "descartadas na próxima gravação.", (unsigned)ignoradas, caminho);
     }
     return 1;
 }
@@ -204,28 +235,33 @@ static int salvar_clientes(const char *caminho, const ListaClientes *lista)
     ResultadoArquivo resultado = arquivo_salvar(caminho, lista);
 
     if (resultado != ARQUIVO_OK) {
-        printf("\n  ! Erro em '%s': %s.\n"
-               "    Nenhuma alteração foi gravada.\n",
-               caminho, arquivo_descrever_erro(resultado));
+        printf("\n");
+        ui_erro("Erro em '%s': %s.", caminho, arquivo_descrever_erro(resultado));
+        ui_erro("Nenhuma alteração foi gravada.");
         return 0;
     }
     return 1;
 }
 
 /**
- * Carrega a lista, executa a operação e libera a memória.
+ * Desenha o cabeçalho, carrega a lista, executa a operação e libera a memória.
  * Centralizar isso garante que nenhuma tela esqueça o lista_liberar().
+ *
+ * @return 1 se a operação foi executada, 0 se o arquivo não pôde ser lido.
  */
-static void executar_operacao(const char *titulo, Operacao operacao, const char *caminho)
+static int executar_operacao(const char *titulo, Operacao operacao, const char *caminho)
 {
     ListaClientes lista;
+    int carregou;
 
-    imprimir_titulo(titulo);
+    ui_cabecalho(titulo);
     lista_iniciar(&lista);
-    if (carregar_clientes(caminho, &lista)) {
+    carregou = carregar_clientes(caminho, &lista);
+    if (carregou) {
         operacao(&lista, caminho);
     }
     lista_liberar(&lista);
+    return carregou;
 }
 
 /* ------------------------------------------------------------------ */
@@ -242,12 +278,15 @@ static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
     int leitura;
 
     memset(&novo, 0, sizeof novo);
-    printf("\n  Informe os dados do novo cliente.\n\n");
+    printf("\n");
+    ui_info("Informe os dados do novo cliente.");
+    printf("\n");
 
     for (;;) {
         leitura = ler_cpf(novo.cpf, sizeof novo.cpf);
         if (leitura == 0) {
-            printf("\n  Cadastro cancelado.\n");
+            printf("\n");
+            ui_aviso("Cadastro cancelado.");
         }
         if (leitura <= 0) {
             return;
@@ -255,46 +294,131 @@ static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
         if (lista_buscar_cpf(lista, novo.cpf) < 0) {
             break;
         }
-        printf("    ! Já existe um cliente cadastrado com este CPF.\n");
+        ui_erro("Já existe um cliente cadastrado com este CPF.");
     }
 
     if (!preencher_dados_cliente(&novo, 0)) {
         return;
     }
 
-    printf("\n  Confira os dados informados:\n\n");
+    printf("\n");
+    ui_info("Confira os dados informados:");
+    printf("\n");
     cliente_exibir(&novo);
 
-    if (confirmar("\n  Confirmar cadastro?") != 1) {
-        printf("\n  Cadastro cancelado. Nenhum dado foi gravado.\n");
+    if (ui_confirmar("\n  Confirmar cadastro?") != 1) {
+        printf("\n");
+        ui_aviso("Cadastro cancelado. Nenhum dado foi gravado.");
         return;
     }
     if (!lista_adicionar(lista, &novo)) {
-        printf("\n  ! Memória insuficiente. Cadastro não realizado.\n");
+        printf("\n");
+        ui_erro("Memória insuficiente. Cadastro não realizado.");
         return;
     }
     if (salvar_clientes(caminho, lista)) {
-        printf("\n  Cliente cadastrado com sucesso!\n");
+        printf("\n");
+        ui_sucesso("Cliente cadastrado com sucesso!");
     }
 }
 
+/**
+ * Desenha a tabela com os clientes que correspondem ao filtro.
+ * A coluna "#" mostra a posição do cliente na lista completa.
+ *
+ * @return quantos clientes foram exibidos.
+ */
+static size_t exibir_tabela_clientes(const ListaClientes *lista, const char *filtro)
+{
+    static const char *const TITULOS[COLUNAS_TABELA] = {"#", "Nome", "CPF", "Cidade/UF"};
+    size_t exibidos = 0;
+    size_t i;
+
+    ui_tabela_topo(LARGURAS_TABELA, COLUNAS_TABELA);
+    ui_tabela_linha(TITULOS, LARGURAS_TABELA, COLUNAS_TABELA, UI_COR_TITULO);
+    ui_tabela_divisoria(LARGURAS_TABELA, COLUNAS_TABELA);
+
+    for (i = 0; i < lista->quantidade; i++) {
+        const Cliente *c = &lista->itens[i];
+        char posicao[12];
+        char cpf[TAM_CPF_FORMATADO];
+        char cidade_uf[TAM_CIDADE + TAM_ESTADO + 1];
+        const char *celulas[COLUNAS_TABELA];
+
+        if (!cliente_corresponde(c, filtro)) {
+            continue;
+        }
+        snprintf(posicao, sizeof posicao, "%u", (unsigned)(i + 1));
+        formatar_cpf(c->cpf, cpf, sizeof cpf);
+        snprintf(cidade_uf, sizeof cidade_uf, "%s/%s", c->cidade, c->estado);
+
+        celulas[0] = posicao;
+        celulas[1] = c->nome;
+        celulas[2] = cpf;
+        celulas[3] = cidade_uf;
+        ui_tabela_linha(celulas, LARGURAS_TABELA, COLUNAS_TABELA, UI_COR_NORMAL);
+        exibidos++;
+    }
+
+    ui_tabela_base(LARGURAS_TABELA, COLUNAS_TABELA);
+    return exibidos;
+}
+
+/**
+ * Listagem em tabela com filtro. A própria pergunta do filtro faz o papel
+ * da pausa: ENTER vazio volta ao menu; um termo refaz a tabela filtrada.
+ */
 static void listar_clientes(ListaClientes *lista, const char *caminho)
 {
-    size_t i;
+    char filtro[TAM_ENTRADA] = "";
+    char entrada[TAM_ENTRADA];
+    char rotulo[TAM_ENTRADA];
+    int primeira_vez = 1;
 
     (void)caminho; /* a listagem não grava nada */
 
     if (lista->quantidade == 0) {
-        printf("\n  Nenhum cliente cadastrado até o momento.\n");
+        printf("\n");
+        ui_info("Nenhum cliente cadastrado até o momento.");
+        ui_pausar();
         return;
     }
 
-    for (i = 0; i < lista->quantidade; i++) {
-        printf("\n  --- Cliente %u de %u ---\n", (unsigned)(i + 1),
-               (unsigned)lista->quantidade);
-        cliente_exibir(&lista->itens[i]);
+    snprintf(rotulo, sizeof rotulo,
+             "\n  %sFiltrar%s por nome, cidade, UF, CPF ou e-mail %s(ENTER para voltar)%s: ",
+             ui_codigo(UI_COR_ROTULO), ui_codigo(UI_COR_NORMAL), ui_codigo(UI_COR_SUAVE),
+             ui_codigo(UI_COR_NORMAL));
+
+    for (;;) {
+        size_t exibidos;
+        ResultadoEntrada leitura;
+
+        if (!primeira_vez) {
+            ui_cabecalho("LISTA DE CLIENTES"); /* redesenha a tela já filtrada */
+        }
+        primeira_vez = 0;
+
+        printf("\n");
+        if (filtro[0] != '\0') {
+            ui_info("Filtro: \"%s\"", filtro);
+        }
+        exibidos = exibir_tabela_clientes(lista, filtro);
+
+        if (exibidos == 0) {
+            ui_aviso("Nenhum cliente corresponde ao filtro.");
+        }
+        printf("  %sExibindo %u de %u.%s Total: %u cliente(s) cadastrado(s).\n",
+               ui_codigo(UI_COR_SUAVE), (unsigned)exibidos, (unsigned)lista->quantidade,
+               ui_codigo(UI_COR_NORMAL), (unsigned)lista->quantidade);
+
+        leitura = ler_linha(rotulo, entrada, sizeof entrada);
+        if (leitura == ENTRADA_FIM || leitura == ENTRADA_VAZIA) {
+            return;
+        }
+        if (leitura == ENTRADA_OK) {
+            snprintf(filtro, sizeof filtro, "%s", entrada);
+        }
     }
-    printf("\n  Total: %u cliente(s) cadastrado(s).\n", (unsigned)lista->quantidade);
 }
 
 /**
@@ -309,39 +433,48 @@ static void alterar_cliente(ListaClientes *lista, const char *caminho)
     Cliente editado;
     int indice;
 
+    printf("\n");
     if (lista->quantidade == 0) {
-        printf("\n  Nenhum cliente cadastrado para alterar.\n");
+        ui_info("Nenhum cliente cadastrado para alterar.");
         return;
     }
 
-    printf("\n  Informe o CPF do cliente que deseja alterar.\n\n");
+    ui_info("Informe o CPF do cliente que deseja alterar.");
+    printf("\n");
     indice = localizar_cliente(lista);
     if (indice < 0) {
         return;
     }
 
     editado = lista->itens[indice];
-    printf("\n  Digite os novos dados. Pressione ENTER para manter o valor atual.\n"
-           "  (O CPF identifica o cliente e não pode ser alterado.)\n\n");
+    printf("\n");
+    ui_info("Digite os novos dados. Pressione ENTER para manter o valor atual.");
+    printf("  %s(O CPF identifica o cliente e não pode ser alterado.)%s\n\n",
+           ui_codigo(UI_COR_SUAVE), ui_codigo(UI_COR_NORMAL));
     if (!preencher_dados_cliente(&editado, 1)) {
         return;
     }
 
     if (clientes_iguais(&editado, &lista->itens[indice])) {
-        printf("\n  Nenhum dado foi modificado.\n");
+        printf("\n");
+        ui_info("Nenhum dado foi modificado.");
         return;
     }
 
-    printf("\n  Novos dados:\n\n");
+    printf("\n");
+    ui_info("Novos dados:");
+    printf("\n");
     cliente_exibir(&editado);
-    if (confirmar("\n  Salvar as alterações?") != 1) {
-        printf("\n  Alteração cancelada. Nenhum dado foi gravado.\n");
+    if (ui_confirmar("\n  Salvar as alterações?") != 1) {
+        printf("\n");
+        ui_aviso("Alteração cancelada. Nenhum dado foi gravado.");
         return;
     }
 
     lista->itens[indice] = editado;
     if (salvar_clientes(caminho, lista)) {
-        printf("\n  Dados alterados com sucesso!\n");
+        printf("\n");
+        ui_sucesso("Dados alterados com sucesso!");
     }
 }
 
@@ -353,28 +486,33 @@ static void remover_cliente(ListaClientes *lista, const char *caminho)
 {
     int indice;
 
+    printf("\n");
     if (lista->quantidade == 0) {
-        printf("\n  Nenhum cliente cadastrado para remover.\n");
+        ui_info("Nenhum cliente cadastrado para remover.");
         return;
     }
 
-    printf("\n  Informe o CPF do cliente que deseja remover.\n\n");
+    ui_info("Informe o CPF do cliente que deseja remover.");
+    printf("\n");
     indice = localizar_cliente(lista);
     if (indice < 0) {
         return;
     }
 
-    if (confirmar("\n  Tem certeza de que deseja remover este cliente?") != 1) {
-        printf("\n  Remoção cancelada. Nenhum dado foi alterado.\n");
+    if (ui_confirmar("\n  Tem certeza de que deseja remover este cliente?") != 1) {
+        printf("\n");
+        ui_aviso("Remoção cancelada. Nenhum dado foi alterado.");
         return;
     }
 
     if (!lista_remover(lista, (size_t)indice)) {
-        printf("\n  ! Erro interno ao remover o cliente.\n");
+        printf("\n");
+        ui_erro("Erro interno ao remover o cliente.");
         return;
     }
     if (salvar_clientes(caminho, lista)) {
-        printf("\n  Cliente removido com sucesso!\n");
+        printf("\n");
+        ui_sucesso("Cliente removido com sucesso!");
     }
 }
 
@@ -382,62 +520,91 @@ static void remover_cliente(ListaClientes *lista, const char *caminho)
 /* Menu principal                                                      */
 /* ------------------------------------------------------------------ */
 
-static void exibir_menu(void)
+/** @return só o nome do arquivo ("clientes.csv"), sem as pastas. */
+static const char *nome_do_arquivo(const char *caminho)
 {
-    imprimir_titulo("GERENCIADOR DE CLIENTES DOGWALKER");
-    printf("  [1] Cadastrar cliente\n");
-    printf("  [2] Alterar cliente\n");
-    printf("  [3] Listar clientes\n");
-    printf("  [4] Remover cliente\n");
-    printf("  [5] Encerrar\n");
+    const char *nome = caminho;
+    const char *p;
+
+    for (p = caminho; *p != '\0'; p++) {
+        if (*p == '/' || *p == '\\') {
+            nome = p + 1;
+        }
+    }
+    return nome;
 }
 
-void menu_executar(const char *caminho_arquivo)
+/**
+ * Monta a barra de status: usuário logado, quantidade de clientes e
+ * arquivo de dados. A contagem relê o arquivo, então está sempre atual.
+ * Mostra só o nome do arquivo, para a barra caber em uma linha.
+ */
+static void montar_status(char *status, size_t tamanho, const char *usuario,
+                          const char *caminho)
 {
-    char entrada[TAM_ENTRADA];
-    int opcao;
+    const char *separador = ui_modo_rico() ? "   •   " : "  |  ";
+    ListaClientes lista;
+    char quantidade[24] = "?";
+
+    lista_iniciar(&lista);
+    if (arquivo_carregar(caminho, &lista, NULL) == ARQUIVO_OK) {
+        snprintf(quantidade, sizeof quantidade, "%u", (unsigned)lista.quantidade);
+    }
+    lista_liberar(&lista);
+
+    snprintf(status, tamanho, "Usuário: %s%sClientes: %s%sDados: %s",
+             usuario, separador, quantidade, separador, nome_do_arquivo(caminho));
+}
+
+void menu_executar(const char *caminho_arquivo, const char *usuario)
+{
+    int selecionado = 0;
 
     /* Laço em vez de recursão: o original chamava mainMenu() de dentro de
      * cada tela, empilhando chamadas sem nunca retornar (risco de estouro
      * de pilha em uso prolongado). */
     for (;;) {
-        ResultadoEntrada leitura;
+        char status[TAM_ENTRADA];
+        int escolha;
+        int executou = 0;
 
-        exibir_menu();
-        leitura = ler_linha("\n  Escolha a opção desejada: ", entrada, sizeof entrada);
-        if (leitura == ENTRADA_FIM) {
+        montar_status(status, sizeof status, usuario, caminho_arquivo);
+        escolha = ui_menu("MENU PRINCIPAL", status, ITENS_MENU, TOTAL_OPCOES, &selecionado);
+
+        if (escolha == UI_MENU_FIM) {
             printf("\n\n  Entrada encerrada. Até logo!\n");
             return;
         }
-        if (leitura != ENTRADA_OK || !converter_inteiro(entrada, &opcao)) {
-            opcao = 0; /* cai no default do switch */
-        }
-
-        switch (opcao) {
-        case OPCAO_CADASTRAR:
-            executar_operacao("CADASTRO DE CLIENTE", cadastrar_cliente, caminho_arquivo);
-            break;
-        case OPCAO_ALTERAR:
-            executar_operacao("ALTERAÇÃO DE CLIENTE", alterar_cliente, caminho_arquivo);
-            break;
-        case OPCAO_LISTAR:
-            executar_operacao("LISTA DE CLIENTES", listar_clientes, caminho_arquivo);
-            break;
-        case OPCAO_REMOVER:
-            executar_operacao("REMOÇÃO DE CLIENTE", remover_cliente, caminho_arquivo);
-            break;
-        case OPCAO_ENCERRAR:
+        if (escolha == UI_MENU_SAIR || escolha == OPCAO_ENCERRAR) {
             printf("\n  Fim da execução. Até logo!\n");
             return;
+        }
+
+        switch (escolha) {
+        case OPCAO_CADASTRAR:
+            executou = executar_operacao("CADASTRO DE CLIENTE", cadastrar_cliente, caminho_arquivo);
+            break;
+        case OPCAO_ALTERAR:
+            executou = executar_operacao("ALTERAÇÃO DE CLIENTE", alterar_cliente, caminho_arquivo);
+            break;
+        case OPCAO_LISTAR:
+            executou = executar_operacao("LISTA DE CLIENTES", listar_clientes, caminho_arquivo);
+            break;
+        case OPCAO_REMOVER:
+            executou = executar_operacao("REMOÇÃO DE CLIENTE", remover_cliente, caminho_arquivo);
+            break;
         default:
-            printf("\n  ! Opção inválida. Digite um número de 1 a 5.\n");
-            continue; /* volta direto ao menu, sem pausar */
+            break;
         }
 
         if (entrada_encerrada()) {
             printf("\n\n  Entrada encerrada. Até logo!\n");
             return;
         }
-        pausar();
+        /* A listagem tem a própria pausa (a pergunta do filtro); mas, se o
+         * arquivo nem pôde ser lido, pausamos para o erro não sumir da tela. */
+        if (escolha != OPCAO_LISTAR || !executou) {
+            ui_pausar();
+        }
     }
 }

@@ -3,8 +3,10 @@
  * @brief Operações sobre a lista dinâmica de clientes.
  */
 #include "cliente.h"
+#include "ui.h"
 #include "validacao.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,19 +99,81 @@ int clientes_iguais(const Cliente *a, const Cliente *b)
         && strcmp(a->cep, b->cep) == 0;
 }
 
+/**
+ * Procura `termo` dentro de `texto` sem diferenciar maiúsculas/minúsculas.
+ * Compara byte a byte com tolower(), o que cobre letras sem acento
+ * ("ana" encontra "Ana"); letras acentuadas precisam coincidir exatamente.
+ */
+static int contem_ignorando_caixa(const char *texto, const char *termo)
+{
+    size_t tamanho_termo = strlen(termo);
+    size_t i;
+    size_t j;
+
+    for (i = 0; texto[i] != '\0'; i++) {
+        for (j = 0; j < tamanho_termo && texto[i + j] != '\0'; j++) {
+            if (tolower((unsigned char)texto[i + j]) != tolower((unsigned char)termo[j])) {
+                break;
+            }
+        }
+        if (j == tamanho_termo) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**
+ * Se o termo for um pedaço de CPF (só dígitos e pontuação), procura os
+ * dígitos no CPF do cliente, que é guardado sem máscara.
+ */
+static int corresponde_cpf(const char *cpf, const char *termo)
+{
+    char digitos[TAM_CPF];
+    size_t quantidade = 0;
+    const char *p;
+
+    for (p = termo; *p != '\0'; p++) {
+        if (isdigit((unsigned char)*p)) {
+            if (quantidade == sizeof digitos - 1) {
+                return 0; /* mais de 11 dígitos: não é CPF */
+            }
+            digitos[quantidade++] = *p;
+        } else if (*p != '.' && *p != '-' && *p != ' ') {
+            return 0; /* tem letras: o termo não é um CPF */
+        }
+    }
+    digitos[quantidade] = '\0';
+    return quantidade > 0 && strstr(cpf, digitos) != NULL;
+}
+
+int cliente_corresponde(const Cliente *cliente, const char *termo)
+{
+    if (termo == NULL || termo[0] == '\0') {
+        return 1;
+    }
+    return contem_ignorando_caixa(cliente->nome, termo)
+        || contem_ignorando_caixa(cliente->email, termo)
+        || contem_ignorando_caixa(cliente->cidade, termo)
+        || contem_ignorando_caixa(cliente->estado, termo)
+        || corresponde_cpf(cliente->cpf, termo);
+}
+
 void cliente_exibir(const Cliente *cliente)
 {
+    const char *rotulo = ui_codigo(UI_COR_ROTULO);
+    const char *normal = ui_codigo(UI_COR_NORMAL);
     char cpf[TAM_CPF_FORMATADO];
     char cep[TAM_CEP_FORMATADO];
 
     formatar_cpf(cliente->cpf, cpf, sizeof cpf);
     formatar_cep(cliente->cep, cep, sizeof cep);
 
-    printf("  Nome ......: %s\n", cliente->nome);
-    printf("  CPF .......: %s\n", cpf);
-    printf("  E-mail ....: %s\n", cliente->email);
-    printf("  Endereço ..: %s, %s - %s\n", cliente->rua, cliente->numero,
-           cliente->bairro);
-    printf("  Cidade/UF .: %s/%s\n", cliente->cidade, cliente->estado);
-    printf("  CEP .......: %s\n", cep);
+    printf("  %sNome ......:%s %s\n", rotulo, normal, cliente->nome);
+    printf("  %sCPF .......:%s %s\n", rotulo, normal, cpf);
+    printf("  %sE-mail ....:%s %s\n", rotulo, normal, cliente->email);
+    printf("  %sEndereço ..:%s %s, %s - %s\n", rotulo, normal, cliente->rua,
+           cliente->numero, cliente->bairro);
+    printf("  %sCidade/UF .:%s %s/%s\n", rotulo, normal, cliente->cidade, cliente->estado);
+    printf("  %sCEP .......:%s %s\n", rotulo, normal, cep);
 }

@@ -1,9 +1,9 @@
 /**
  * @file terminal.c
- * @brief Leitura segura do teclado e utilitários de tela.
+ * @brief Leitura segura do teclado: linhas, senha e teclas de navegação.
  *
- * Único módulo (junto com a troca de arquivo em arquivo.c) que contém
- * código específico de sistema operacional, isolado por #ifdef _WIN32.
+ * Concentra o código de teclado específico de cada sistema operacional,
+ * isolado por #ifdef _WIN32. A parte visual (cores, bordas) fica em ui.c.
  */
 #ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L /* habilita termios/unistd com -std=c11 */
@@ -12,7 +12,6 @@
 #include "terminal.h"
 #include "validacao.h"
 
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -25,14 +24,19 @@
 #include <unistd.h>
 #endif
 
-#define LARGURA_TITULO 50
-
-/* Códigos de tecla tratados na digitação da senha. */
+/* Códigos de tecla tratados na senha e nos menus. */
 #define TECLA_CTRL_C     3
 #define TECLA_CTRL_D     4   /* fim de entrada no Linux/macOS */
 #define TECLA_BACKSPACE  8   /* Windows */
 #define TECLA_CTRL_Z     26  /* fim de entrada no Windows */
+#define TECLA_ESC        27
 #define TECLA_DEL        127 /* Backspace no Linux/macOS */
+
+/* No Windows, _getch devolve as setas como dois códigos: 0xE0 (ou 0) e
+ * depois 72 (cima) ou 80 (baixo). */
+#define WIN_PREFIXO_ESTENDIDA 0xE0
+#define WIN_SETA_CIMA         72
+#define WIN_SETA_BAIXO        80
 
 /* ------------------------------------------------------------------ */
 /* Código dependente de plataforma                                     */
@@ -50,24 +54,32 @@ void terminal_configurar(void)
 #endif
 }
 
-/*
- * Modo "tecla a tecla" usado na senha: cada tecla chega ao programa na
- * hora (sem esperar ENTER) e sem aparecer na tela, para que possamos
- * exibir um '*' no lugar de cada caractere.
- *
- * iniciar_modo_senha() retorna 0 quando a entrada não é um teclado
- * (ex.: redirecionada de um arquivo nos testes). Nesse caso a senha é
- * lida como uma linha comum.
- */
-#ifdef _WIN32
-static int iniciar_modo_senha(void)
+int terminal_interativo(void)
 {
+#ifdef _WIN32
     DWORD modo;
-    /* _getch já lê tecla a tecla e sem eco; basta conferir se é um console. */
     return GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &modo) != 0;
+#else
+    return isatty(STDIN_FILENO);
+#endif
 }
 
-static void encerrar_modo_senha(void)
+/*
+ * Modo "tecla a tecla", usado na senha e nos menus: cada tecla chega ao
+ * programa na hora (sem esperar ENTER) e sem aparecer na tela.
+ *
+ * iniciar_modo_tecla() retorna 0 quando a entrada não é um teclado
+ * (ex.: redirecionada de um arquivo nos testes); quem chama deve então
+ * usar a leitura por linha.
+ */
+#ifdef _WIN32
+static int iniciar_modo_tecla(void)
+{
+    /* _getch já lê tecla a tecla e sem eco; basta conferir se é um console. */
+    return terminal_interativo();
+}
+
+static void encerrar_modo_tecla(void)
 {
 }
 
@@ -78,7 +90,7 @@ static int ler_tecla(void)
 #else
 static struct termios config_original;
 
-static int iniciar_modo_senha(void)
+static int iniciar_modo_tecla(void)
 {
     struct termios config;
 
@@ -94,7 +106,7 @@ static int iniciar_modo_senha(void)
     return tcsetattr(STDIN_FILENO, TCSANOW, &config) == 0;
 }
 
-static void encerrar_modo_senha(void)
+static void encerrar_modo_tecla(void)
 {
     tcsetattr(STDIN_FILENO, TCSANOW, &config_original);
 }
@@ -102,6 +114,32 @@ static void encerrar_modo_senha(void)
 static int ler_tecla(void)
 {
     return getchar();
+}
+
+/**
+ * Lê uma tecla esperando no máximo 0,1 s. No Linux, Esc sozinho e as setas
+ * (ESC [ A) começam com o mesmo byte; se nada chegar logo depois do ESC,
+ * foi o Esc mesmo.
+ */
+static int ler_tecla_com_espera_curta(void)
+{
+    struct termios config;
+    int tecla;
+
+    tcgetattr(STDIN_FILENO, &config);
+    config.c_cc[VMIN] = 0;
+    config.c_cc[VTIME] = 1; /* décimos de segundo */
+    tcsetattr(STDIN_FILENO, TCSANOW, &config);
+
+    tecla = getchar();
+    if (tecla == EOF) {
+        clearerr(stdin); /* tempo esgotado não é fim de entrada */
+    }
+
+    config.c_cc[VMIN] = 1;
+    config.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &config);
+    return tecla;
 }
 #endif
 
@@ -166,7 +204,7 @@ ResultadoEntrada ler_senha(const char *rotulo, char *destino, size_t tamanho)
     size_t comprimento = 0;
     int excedeu = 0;
 
-    if (!iniciar_modo_senha()) {
+    if (!iniciar_modo_tecla()) {
         return ler_linha(rotulo, destino, tamanho);
     }
 
@@ -181,12 +219,12 @@ ResultadoEntrada ler_senha(const char *rotulo, char *destino, size_t tamanho)
         }
         if (tecla == EOF || tecla == TECLA_CTRL_C || tecla == TECLA_CTRL_D
             || tecla == TECLA_CTRL_Z) {
-            encerrar_modo_senha();
+            encerrar_modo_tecla();
             printf("\n");
             return ENTRADA_FIM;
         }
 #ifdef _WIN32
-        if (tecla == 0 || tecla == 0xE0) {
+        if (tecla == 0 || tecla == WIN_PREFIXO_ESTENDIDA) {
             (void)ler_tecla(); /* setas e teclas F enviam dois códigos: ignora */
             continue;
         }
@@ -212,7 +250,7 @@ ResultadoEntrada ler_senha(const char *rotulo, char *destino, size_t tamanho)
         }
     }
 
-    encerrar_modo_senha();
+    encerrar_modo_tecla();
     printf("\n");
 
     senha[comprimento] = '\0';
@@ -226,69 +264,61 @@ ResultadoEntrada ler_senha(const char *rotulo, char *destino, size_t tamanho)
     return ENTRADA_OK;
 }
 
-int confirmar(const char *pergunta)
+TeclaNavegacao ler_tecla_navegacao(int *caractere)
 {
-    char rotulo[TAM_ENTRADA];
-    char resposta[TAM_ENTRADA];
-    size_t i;
+    TeclaNavegacao resultado;
+    int tecla;
 
-    snprintf(rotulo, sizeof rotulo, "%s [s/n]: ", pergunta);
-
-    for (;;) {
-        ResultadoEntrada resultado = ler_linha(rotulo, resposta, sizeof resposta);
-        if (resultado == ENTRADA_FIM) {
-            return -1;
-        }
-        if (resultado == ENTRADA_OK) {
-            for (i = 0; resposta[i] != '\0'; i++) {
-                resposta[i] = (char)tolower((unsigned char)resposta[i]);
-            }
-            if (strcmp(resposta, "s") == 0 || strcmp(resposta, "sim") == 0) {
-                return 1;
-            }
-            if (strcmp(resposta, "n") == 0 || strcmp(resposta, "nao") == 0
-                || strcmp(resposta, "não") == 0) {
-                return 0;
-            }
-        }
-        printf("    ! Responda com 's' para sim ou 'n' para não.\n");
+    *caractere = 0;
+    if (!iniciar_modo_tecla()) {
+        return TECLA_NAV_FIM;
     }
-}
+    fflush(stdout);
+    tecla = ler_tecla();
 
-void pausar(void)
-{
-    char descarte[TAM_ENTRADA];
-
-    if (!entrada_encerrada()) {
-        (void)ler_linha("\n  Pressione ENTER para voltar ao menu...",
-                        descarte, sizeof descarte);
+#ifdef _WIN32
+    if (tecla == 0 || tecla == WIN_PREFIXO_ESTENDIDA) {
+        int codigo = ler_tecla();
+        encerrar_modo_tecla();
+        if (codigo == WIN_SETA_CIMA) {
+            return TECLA_NAV_CIMA;
+        }
+        return (codigo == WIN_SETA_BAIXO) ? TECLA_NAV_BAIXO : TECLA_NAV_OUTRA;
     }
+#else
+    if (tecla == TECLA_ESC) {
+        int seguinte = ler_tecla_com_espera_curta();
+        if (seguinte == '[' || seguinte == 'O') {
+            int codigo = ler_tecla_com_espera_curta();
+            encerrar_modo_tecla();
+            if (codigo == 'A') {
+                return TECLA_NAV_CIMA;
+            }
+            return (codigo == 'B') ? TECLA_NAV_BAIXO : TECLA_NAV_OUTRA;
+        }
+        /* nada (ou outra tecla) logo após o ESC: foi o Esc sozinho */
+    }
+#endif
+
+    if (tecla == '\r' || tecla == '\n') {
+        resultado = TECLA_NAV_ENTER;
+    } else if (tecla == TECLA_ESC) {
+        resultado = TECLA_NAV_ESC;
+    } else if (tecla == EOF || tecla == TECLA_CTRL_C || tecla == TECLA_CTRL_D
+               || tecla == TECLA_CTRL_Z) {
+        resultado = TECLA_NAV_FIM;
+    } else if (tecla >= 32 && tecla < 127) {
+        *caractere = tecla;
+        resultado = TECLA_NAV_CARACTERE;
+    } else {
+        resultado = TECLA_NAV_OUTRA;
+    }
+
+    encerrar_modo_tecla();
+    return resultado;
 }
 
 int entrada_encerrada(void)
 {
     return feof(stdin) || ferror(stdin);
-}
-
-/* ------------------------------------------------------------------ */
-/* Exibição                                                            */
-/* ------------------------------------------------------------------ */
-
-static void imprimir_linha(char caractere)
-{
-    int i;
-    for (i = 0; i < LARGURA_TITULO; i++) {
-        putchar(caractere);
-    }
-    putchar('\n');
-}
-
-void imprimir_titulo(const char *titulo)
-{
-    /* No lugar de system("cls"), que só existe no Windows e executa um
-     * processo externo, separamos as telas com títulos bem visíveis. */
-    printf("\n");
-    imprimir_linha('=');
-    printf("  %s\n", titulo);
-    imprimir_linha('=');
 }
