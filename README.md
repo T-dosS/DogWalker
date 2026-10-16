@@ -368,16 +368,20 @@ Este projeto demonstra:
 
 ## Autor
 
-Projeto acadêmico desenvolvido em grupo e refatorado por:
+Projeto acadêmico desenvolvido em grupo.
 
-* **Thawan Santos**: [GitHub](https://github.com/T-dosS)
+### Autores do código
 
-Integrantes do trabalho original:
+* **Thawan Santos**: autor e responsável pela refatoração ([GitHub](https://github.com/T-dosS))
+* **Kaique Taquett**: coautor
 
-* [Nome do integrante]
-* [Nome do integrante]
+### Integrantes do grupo
+
+* Sabrina Fernandes
+* Jhenipher
+* Adilson Honda
+* Paulo Bokor
 
 ## Licença
 
 Distribuído sob a licença MIT. Veja [`LICENSE`](LICENSE).
-Por se tratar de um trabalho em grupo, confirme com os demais integrantes antes de publicar.
