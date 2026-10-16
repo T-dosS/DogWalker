@@ -13,6 +13,7 @@
 #include "arquivo.h"
 #include "cliente.h"
 #include "terminal.h"
+#include "ui.h"
 #include "validacao.h"
 
 #include <stdio.h>
@@ -416,6 +417,54 @@ static void testar_muitos_clientes(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* Filtro da listagem e alinhamento da interface                       */
+/* ------------------------------------------------------------------ */
+
+static void testar_filtro(void)
+{
+    Cliente c = criar_cliente(CPF_A, "Ana Souza");
+    snprintf(c.cidade, sizeof c.cidade, "%s", "São Paulo");
+    snprintf(c.email, sizeof c.email, "%s", "ana.souza@example.com");
+
+    VERIFICAR(cliente_corresponde(&c, NULL));
+    VERIFICAR(cliente_corresponde(&c, ""));
+    VERIFICAR(cliente_corresponde(&c, "ana"));          /* sem diferenciar caixa */
+    VERIFICAR(cliente_corresponde(&c, "SOUZA"));
+    VERIFICAR(cliente_corresponde(&c, "são"));          /* acento igual          */
+    VERIFICAR(cliente_corresponde(&c, "example.com"));  /* e-mail                */
+    VERIFICAR(cliente_corresponde(&c, "sp"));           /* UF                    */
+    VERIFICAR(cliente_corresponde(&c, "529.982"));      /* CPF com máscara       */
+    VERIFICAR(cliente_corresponde(&c, "24725"));        /* fim do CPF            */
+    VERIFICAR(!cliente_corresponde(&c, "Bruno"));
+    VERIFICAR(!cliente_corresponde(&c, "111.444"));
+    VERIFICAR(!cliente_corresponde(&c, "529982247250000")); /* dígitos demais */
+}
+
+static void testar_largura_e_truncamento(void)
+{
+    char saida[64];
+
+    /* Os testes não chamam ui_iniciar(): a interface fica no modo simples. */
+    VERIFICAR(!ui_modo_rico());
+    VERIFICAR(strcmp(ui_codigo(UI_COR_ERRO), "") == 0);
+
+    VERIFICAR(ui_largura_texto("") == 0);
+    VERIFICAR(ui_largura_texto("Ana") == 3);
+    VERIFICAR(ui_largura_texto("Conceição") == 9); /* 11 bytes, 9 colunas */
+    VERIFICAR(ui_largura_texto("─│╭") == 3);       /* bordas: 3 bytes cada */
+
+    ui_truncar("Ana", 10, saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "Ana") == 0);
+    ui_truncar("Cláudia Conceição", 17, saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "Cláudia Conceição") == 0); /* cabe exatamente */
+    ui_truncar("Cláudia Conceição", 10, saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "Cláudia...") == 0);
+    VERIFICAR(ui_largura_texto(saida) == 10);
+    ui_truncar("ççççç", 4, saida, sizeof saida);     /* não corta "ç" ao meio */
+    VERIFICAR(strcmp(saida, "ç...") == 0);
+}
+
+/* ------------------------------------------------------------------ */
 
 typedef struct {
     const char *nome;
@@ -437,6 +486,8 @@ int main(void)
         {"Arquivo com BOM UTF-8 e quebras CRLF", testar_crlf_e_bom},
         {"Gravação em pasta inexistente retorna erro", testar_pasta_inexistente},
         {"500 clientes: gravação e leitura", testar_muitos_clientes},
+        {"Filtro da listagem: nome, cidade, UF, e-mail e CPF", testar_filtro},
+        {"Interface: largura UTF-8 e truncamento sem cortar acentos", testar_largura_e_truncamento},
     };
     size_t i;
 
