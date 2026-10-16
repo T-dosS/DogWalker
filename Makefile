@@ -3,8 +3,9 @@
 #
 #   make        compila o programa
 #   make run    compila (se necessário) e executa
-#   make test   compila e executa os testes automatizados
-#   make clean  apaga os executáveis gerados
+#   make test      compila e executa os testes automatizados
+#   make cenarios  testes de uso ponta a ponta (Windows, PowerShell)
+#   make clean     apaga os executáveis gerados
 #
 # Funciona com GCC no Linux/macOS e com MinGW-w64 no Windows
 # (no Windows, use "mingw32-make" no Prompt de Comando ou PowerShell).
@@ -34,7 +35,7 @@ endif
 BIN      = dogwalker$(EXE)
 TEST_BIN = test_dogwalker$(EXE)
 
-.PHONY: all run test clean
+.PHONY: all run test cenarios clean
 
 all: $(BIN)
 
@@ -50,6 +51,10 @@ test: $(TEST_BIN)
 
 $(TEST_BIN): $(TEST_SRC) $(LIB_SRC) $(HEADERS)
 	$(CC) $(CFLAGS) $(TEST_SRC) $(LIB_SRC) -o $@
+
+# Simula um usuário digitando (28 cenários) e confere mensagens e o CSV.
+cenarios: $(BIN)
+	powershell -NoProfile -ExecutionPolicy Bypass -File tests/cenarios.ps1
 
 clean:
 	-$(RM) $(BIN) $(TEST_BIN)

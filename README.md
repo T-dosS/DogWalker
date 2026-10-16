@@ -101,10 +101,12 @@ DogWalker/
 │   ├── ANALISE_CODIGO_ORIGINAL.md  # problemas do código original e correções
 │   ├── DECISOES_TECNICAS.md        # por que cada escolha foi feita
 │   ├── INTERFACE.md                # alternativas avaliadas para a interface e a escolhida
+│   ├── ROADMAP.md                  # próximos passos priorizados
 │   ├── img/                        # capturas de tela usadas neste README
 │   └── codigo-original/
 │       └── dogwalker_original.c    # versão original (não compilada)
 ├── .vscode/                    # compilar (Ctrl+Shift+B), executar, testar e depurar (F5)
+├── CHANGELOG.md                # histórico de alterações por versão
 ├── .gitignore
 ├── LICENSE
 ├── Makefile
@@ -175,6 +177,7 @@ Erros de compilação aparecem na aba **Problemas** com link para a linha.
 | `make` | Compila o programa e gera `dogwalker` (`dogwalker.exe` no Windows) |
 | `make run` | Compila se necessário, garante que a pasta `data/` existe e executa |
 | `make test` | Compila e executa os testes automatizados; retorna erro se algum falhar |
+| `make cenarios` | Executa os 28 testes de uso ponta a ponta (Windows/PowerShell) |
 | `make clean` | Remove os executáveis gerados |
 
 No Windows, troque `make` por `mingw32-make`.
@@ -304,6 +307,17 @@ Executando testes do DogWalker...
 1244 verificações, 0 falha(s).
 ```
 
+### Testes de cenário (Windows)
+
+```bash
+mingw32-make cenarios
+```
+
+O script [`tests/cenarios.ps1`](tests/cenarios.ps1) executa o programa com entradas
+redirecionadas e simula 28 usos completos: login, cadastro com erros, filtro, alteração, remoção,
+arquivo vazio/corrompido, pasta inexistente e fim de entrada. Ele também confere no CSV que
+a alteração e a remoção afetaram **só** o cliente escolhido.
+
 ### Roteiro de testes manuais
 
 | # | Cenário | Como testar | Resultado esperado |
@@ -369,6 +383,9 @@ Este projeto demonstra:
 * Refatoração de código legado preservando o comportamento esperado
 
 ## Melhorias futuras
+
+O backlog priorizado, com status e decisões pendentes, fica em [`docs/ROADMAP.md`](docs/ROADMAP.md),
+e o histórico de cada versão em [`CHANGELOG.md`](CHANGELOG.md). Em resumo:
 
 * Senha armazenada com **hash** (ex.: Argon2/bcrypt via libsodium) e cadastro de usuários
 * Cadastro dos **cães** de cada cliente (nome, raça, porte) e agenda de passeios
