@@ -3,22 +3,24 @@
 ## 1. Estrutura de módulos
 
 ```
-main.c ──► login.c ──► terminal.c
-   │
-   └────► menu.c ──► cliente.c ──► validacao.c
-              │          ▲
-              └────► arquivo.c
+main.c ─► login.c ─┐
+   │               ├─► ui.c ─► terminal.c
+   └────► menu.c ──┘
+              │
+              ├─► cliente.c ─► validacao.c
+              └─► arquivo.c
 ```
 
 | Módulo | Responsabilidade | Por que separado |
 |--------|------------------|------------------|
 | `main.c` | Configura o terminal, exige login e chama o menu | Fica com ~20 linhas, e o fluxo do programa é lido em segundos |
 | `login.c` | Autenticação | Regra de acesso isolada; trocar por hash/arquivo de usuários não afeta o resto |
-| `menu.c` | Menu e telas (cadastrar, alterar, listar, remover) | Toda a interação com o usuário em um lugar só |
+| `menu.c` | Telas (cadastrar, alterar, listar com filtro, remover) | Decide **o que** mostrar; não contém códigos de cor |
 | `cliente.c` | `struct Cliente` e a lista dinâmica | Não usa teclado nem arquivo, então pode ser testado sozinho |
 | `validacao.c` | Regras de cada campo (CPF, e-mail, UF, CEP, texto) | Regras de negócio puras, 100% testáveis |
 | `arquivo.c` | Ler/gravar CSV | Trocar o formato (ex.: binário/SQLite) só altera este arquivo |
-| `terminal.c` | Leitura segura do teclado e código específico de SO | Concentra `#ifdef _WIN32` e substitui `scanf`/`fflush(stdin)` |
+| `terminal.c` | Leitura segura do teclado (linhas, senha, setas/Esc) | Concentra o `#ifdef _WIN32` do teclado e substitui `scanf`/`fflush(stdin)` |
+| `ui.c` | Cores ANSI, bordas Unicode, mensagens, tabelas e menu | Toda a aparência em um ponto; modo simples automático. Veja [INTERFACE.md](INTERFACE.md) |
 
 **Por que não menos arquivos?** Com um único `.c` não seria possível testar
 as regras sem o menu interativo. **Por que não mais?** Separar cada tela em um

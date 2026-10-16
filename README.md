@@ -7,6 +7,8 @@
 Sistema de linha de comando para cadastrar, listar, alterar e remover clientes
 de um serviço de passeio de cães, com login e armazenamento em arquivo CSV.
 
+![Menu principal com navegação por setas](docs/img/menu.png)
+
 ---
 
 ## Sobre o projeto
@@ -33,17 +35,20 @@ e a análise detalhada de cada problema está em [`docs/ANALISE_CODIGO_ORIGINAL.
 |----------------|-----------|
 | 🔐 **Login** | Usuário e senha, senha mascarada com `*` (Backspace funciona), máximo de 3 tentativas |
 | ➕ **Cadastro** | CPF validado (dígitos verificadores), sem duplicidade, todos os campos validados, confirmação antes de gravar |
-| 📋 **Listagem** | Todos os clientes, com CPF e CEP formatados e total |
+| 📋 **Listagem** | Tabela com bordas e filtro por nome, cidade, UF, CPF (com ou sem máscara) ou e-mail |
 | ✏️ **Alteração** | Busca por CPF, mostra os dados atuais, ENTER mantém o valor, confirmação antes de gravar |
 | 🗑️ **Remoção** | Busca por CPF, mostra os dados, pede confirmação e remove apenas aquele cliente |
 | 💾 **Persistência** | Arquivo CSV (`data/clientes.csv`) com gravação segura via arquivo temporário |
+| 🎨 **Interface** | Cores, bordas e ícones; menu com setas, atalhos por número/letra e Esc; barra de status; modo texto simples automático quando não há terminal |
 
 ## Tecnologias utilizadas
 
 * **Linguagem C (padrão C11)**, compilada com GCC (Linux/macOS) ou MinGW-w64 (Windows)
-* **Biblioteca padrão:** `stdio.h`, `stdlib.h`, `string.h`, `ctype.h`, `errno.h`, `limits.h`
-* **APIs do sistema (isoladas por `#ifdef`):** `windows.h` (UTF-8 no console, eco da senha e
-  troca atômica de arquivo) e `termios.h`/`unistd.h` (eco da senha no Linux/macOS)
+* **Biblioteca padrão:** `stdio.h`, `stdlib.h`, `string.h`, `ctype.h`, `errno.h`, `limits.h`, `stdarg.h`
+* **APIs do sistema (isoladas por `#ifdef`):** `windows.h`/`conio.h` (UTF-8 e cores no console,
+  leitura de teclas, troca atômica de arquivo) e `termios.h`/`unistd.h` (leitura de teclas no Linux/macOS)
+* **Interface:** sequências **ANSI** (cores, limpar tela, cursor) e caracteres **Unicode**
+  (bordas e ícones), sem nenhuma biblioteca externa. Veja [`docs/INTERFACE.md`](docs/INTERFACE.md)
 * **Armazenamento:** arquivo **CSV** separado por `;`, codificado em UTF-8
 * **Build:** GNU Make
 
@@ -52,15 +57,17 @@ e a análise detalhada de cada problema está em [`docs/ANALISE_CODIGO_ORIGINAL.
 | Conceito | Onde aparece |
 |----------|--------------|
 | **Structs** | `Cliente` e `ListaClientes` em [`cliente.h`](include/cliente.h) |
-| **Funções e modularização** | 6 módulos com `.h` (interface) e `.c` (implementação) |
+| **Funções e modularização** | 7 módulos com `.h` (interface) e `.c` (implementação); a parte visual isolada em `ui.c` |
 | **Ponteiros** | Passagem por referência (`Cliente *`), aritmética em `dividir_campos`, ponteiros de função (`Normalizador`, `Operacao`) |
+| **Funções variádicas** | `ui_erro("...%s", valor)` com `va_list`/`vprintf` e checagem de formato pelo compilador |
+| **UTF-8** | `ui_largura_texto` e `ui_truncar` alinham tabelas contando colunas, não bytes |
 | **Alocação dinâmica** | Vetor que cresce com `realloc` (capacidade dobra), `free` centralizado em `lista_liberar` |
 | **Strings** | `fgets`, `strchr`, `strcmp`, `memmove`, `snprintf`; remoção de espaços; normalização de CPF/CEP |
 | **Arquivos** | `fopen`/`fgets`/`fprintf`/`fclose` com verificação de erro, arquivo temporário e `rename` |
 | **Condicionais** | `switch` do menu com `enum`, regras de validação |
 | **Loops** | Menu em laço (sem recursão), repetição de perguntas até valor válido |
 | **Validação de dados** | Algoritmo dos dígitos verificadores do CPF, e-mail, UF, CEP, tamanho dos campos |
-| **Enums** | `ResultadoEntrada`, `ResultadoArquivo`, `OpcaoMenu` |
+| **Enums** | `ResultadoEntrada`, `ResultadoArquivo`, `OpcaoMenu`, `UiCor`, `TeclaNavegacao` |
 | **Compilação condicional** | `#ifdef _WIN32` para portabilidade |
 | **Testes automatizados** | [`tests/test_dogwalker.c`](tests/test_dogwalker.c), sem bibliotecas externas |
 
@@ -74,14 +81,16 @@ DogWalker/
 │   ├── login.h                 #   autenticação
 │   ├── menu.h                  #   menu principal
 │   ├── terminal.h              #   leitura segura do teclado
+│   ├── ui.h                    #   camada visual: cores, bordas, tabelas, menu
 │   └── validacao.h             #   regras de validação dos campos
 ├── src/                        # Implementações
 │   ├── main.c                  #   ponto de entrada: login → menu
 │   ├── arquivo.c               #   CSV, gravação segura via .tmp
 │   ├── cliente.c               #   adicionar, buscar por CPF, remover
 │   ├── login.c                 #   tela de login (3 tentativas)
-│   ├── menu.c                  #   telas de cadastro, alteração, listagem e remoção
-│   ├── terminal.c              #   fgets seguro, senha com *, UTF-8 (Windows/Linux)
+│   ├── menu.c                  #   telas de cadastro, alteração, listagem (com filtro) e remoção
+│   ├── terminal.c              #   fgets seguro, senha com *, setas/Esc (Windows/Linux)
+│   ├── ui.c                    #   modo rico (ANSI + Unicode) e modo simples automático
 │   └── validacao.c             #   CPF, e-mail, UF, CEP, texto, conversão de inteiro
 ├── tests/
 │   └── test_dogwalker.c        # testes automatizados (make test)
@@ -91,6 +100,8 @@ DogWalker/
 ├── docs/
 │   ├── ANALISE_CODIGO_ORIGINAL.md  # problemas do código original e correções
 │   ├── DECISOES_TECNICAS.md        # por que cada escolha foi feita
+│   ├── INTERFACE.md                # alternativas avaliadas para a interface e a escolhida
+│   ├── img/                        # capturas de tela usadas neste README
 │   └── codigo-original/
 │       └── dogwalker_original.c    # versão original (não compilada)
 ├── .vscode/                    # compilar (Ctrl+Shift+B), executar, testar e depurar (F5)
@@ -137,7 +148,7 @@ gcc -std=c11 -Wall -Wextra -Wpedantic -Iinclude src/*.c -o dogwalker
 ```
 
 > No PowerShell o curinga `src/*.c` não é expandido para o gcc. Use a lista explícita:
-> `gcc -std=c11 -Wall -Wextra -Iinclude src/main.c src/arquivo.c src/cliente.c src/login.c src/menu.c src/terminal.c src/validacao.c -o dogwalker.exe`
+> `gcc -std=c11 -Wall -Wextra -Iinclude src/main.c src/arquivo.c src/cliente.c src/login.c src/menu.c src/terminal.c src/ui.c src/validacao.c -o dogwalker.exe`
 
 ### No VS Code
 
@@ -202,38 +213,41 @@ Para começar com dados de demonstração:
 cp data/clientes_exemplo.csv data/clientes.csv
 ```
 
-### Exemplo: cadastro
+### Atalhos de teclado
 
+| Onde | Tecla | Ação |
+|------|-------|------|
+| Menu | `↑` `↓` | Move o destaque (circular) |
+| Menu | `Enter` | Abre a opção destacada |
+| Menu | `1`–`5` | Abre a opção direto, sem Enter |
+| Menu | `C` `A` `L` `R` `S` | **C**adastrar, **A**lterar, **L**istar, **R**emover, **S**air |
+| Menu | `Esc` | Encerra o programa |
+| Listagem | texto + `Enter` | Filtra por nome, cidade, UF, CPF ou e-mail |
+| Listagem | `Enter` vazio | Volta ao menu |
+| Senha | `Backspace` | Apaga o último caractere |
+| Qualquer pergunta | `Ctrl+Z` (Windows) / `Ctrl+D` (Linux) | Encerra |
+
+### Modo rico e modo simples
+
+A interface escolhe o modo sozinha:
+
+* **Modo rico:** quando o programa roda num terminal com suporte a cores (Windows 10+,
+  Windows Terminal, terminal do VS Code, Linux, macOS). Usa cores, bordas Unicode e menu por setas.
+* **Modo simples:** quando a saída é redirecionada (testes, `programa > log.txt`), o terminal é
+  antigo, ou você define `NO_COLOR=1` ou `DOGWALKER_SIMPLES=1`. Usa texto puro, bordas ASCII
+  (`+--+`) e menu por número ou letra + Enter.
+
+```bash
+DOGWALKER_SIMPLES=1 ./dogwalker
 ```
-==================================================
-  CADASTRO DE CLIENTE
-==================================================
 
-  Informe os dados do novo cliente.
+### Listagem com filtro
 
-  CPF (ENTER vazio para cancelar): 111.444.777-35
-  Nome: Bruno Lima
-  E-mail: Bruno.Lima@Example.com
-  Rua: Avenida Brasil
-  Número: 1500
-  Bairro: Jardim América
-  Cidade: Rio de Janeiro
-  Estado (UF): rj
-  CEP: 20040002
+![Listagem filtrada por cidade](docs/img/listagem-filtro.png)
 
-  Confira os dados informados:
+### Validação durante o cadastro
 
-  Nome ......: Bruno Lima
-  CPF .......: 111.444.777-35
-  E-mail ....: bruno.lima@example.com
-  Endereço ..: Avenida Brasil, 1500 - Jardim América
-  Cidade/UF .: Rio de Janeiro/RJ
-  CEP .......: 20040-002
-
-  Confirmar cadastro? [s/n]: s
-
-  Cliente cadastrado com sucesso!
-```
+![Mensagens de erro de validação](docs/img/cadastro-validacao.png)
 
 ### Exemplo: alteração (ENTER mantém o valor atual)
 
@@ -251,18 +265,7 @@ cp data/clientes_exemplo.csv data/clientes.csv
   ...
   Salvar as alterações? [s/n]: s
 
-  Dados alterados com sucesso!
-```
-
-### Exemplo: validação em ação
-
-```
-  CPF (ENTER vazio para cancelar): 123.456.789-00
-    ! CPF inválido. Digite 11 dígitos, com ou sem pontuação (ex.: 529.982.247-25).
-  E-mail: ana@gmail
-    ! E-mail inválido. Exemplo de formato aceito: nome@dominio.com
-  Estado (UF): São Paulo
-    ! Estado inválido. Use a sigla da UF com 2 letras (ex.: SP, RJ, MG).
+  ✔ Dados alterados com sucesso!
 ```
 
 ## Testes
@@ -286,6 +289,8 @@ sem interação humana:
 * Arquivo com BOM UTF-8 e quebras de linha CRLF (salvo pelo Excel/Bloco de Notas)
 * Gravação em pasta inexistente (deve retornar erro)
 * 500 clientes gravados e lidos
+* Filtro da listagem (maiúsculas/minúsculas, acentos, UF, e-mail, CPF com máscara)
+* Interface: largura de textos UTF-8 e truncamento sem cortar caracteres acentuados
 
 Saída esperada (resumida):
 
@@ -294,9 +299,9 @@ Executando testes do DogWalker...
 
   [ OK ] CPF: máscara, dígitos verificadores e rejeições
   ...
-  [ OK ] 500 clientes: gravação e leitura
+  [ OK ] Interface: largura UTF-8 e truncamento sem cortar acentos
 
-N verificações, 0 falha(s).
+1244 verificações, 0 falha(s).
 ```
 
 ### Roteiro de testes manuais
@@ -312,7 +317,10 @@ N verificações, 0 falha(s).
 | 7 | CPF inválido | `123.456.789-00`, `abc`, `111.111.111-11` | Mensagem de CPF inválido |
 | 8 | CPF duplicado | Cadastrar um CPF já existente | "Já existe um cliente cadastrado com este CPF." |
 | 9 | Cancelar cadastro | Responder `n` na confirmação | Nada é gravado |
-| 10 | Listagem | Opção 3 | Todos os clientes formatados e o total |
+| 10 | Listagem | Opção 3 (ou tecla `L`) | Tabela com todos os clientes e o total |
+| 10b | Filtro | Na listagem, digitar `rio`, depois `529.982` | Só os clientes correspondentes; "Exibindo X de Y" |
+| 10c | Navegação | `↓` `↓` `Enter` no menu; `↑` no primeiro item | Abre "Listar"; o destaque dá a volta até "Encerrar" |
+| 10d | Modo simples | `DOGWALKER_SIMPLES=1` (ou `NO_COLOR=1`) | Sem cores, bordas ASCII, menu por número/letra + Enter |
 | 11 | Listagem vazia | Apagar `data/clientes.csv` e listar | "Nenhum cliente cadastrado até o momento." |
 | 12 | Alteração | Opção 2, mudar só o e-mail | Só o e-mail daquele cliente muda (confira os demais na listagem) |
 | 13 | Alteração sem mudança | ENTER em todos os campos | "Nenhum dado foi modificado." |
@@ -337,7 +345,9 @@ N verificações, 0 falha(s).
 * ✅ Formato de arquivo estruturado (CSV) e gravação segura via arquivo temporário
 * ✅ Sem `system("cls")`, `conio.h` ou `sleep`, e compila em Windows, Linux e macOS
 * ✅ Login com senha mascarada (`*`) e limite de tentativas
-* ✅ Nenhuma variável global mutável; 6 módulos com responsabilidades claras
+* ✅ Interface de terminal moderna (cores, bordas, menu por setas, filtro, status) sem bibliotecas,
+  com modo simples automático para testes e terminais antigos
+* ✅ Nenhuma variável global mutável; 7 módulos com responsabilidades claras
 * ✅ Testes automatizados, Makefile, `.gitignore` protegendo dados pessoais
 * ✅ Documentação de funções no estilo Doxygen e documentos de decisões técnicas
 
@@ -351,6 +361,8 @@ Este projeto demonstra:
 * Gerenciamento de memória com `malloc`/`realloc`/`free` sem vazamentos
 * Persistência em arquivo com tratamento de erro e gravação atômica
 * Separação entre interface, regras de negócio e armazenamento
+* Interfaces de terminal com sequências ANSI, Unicode e leitura de teclas sem bibliotecas,
+  degradando com elegância quando o ambiente não suporta
 * Uso de ponteiros de função para eliminar código duplicado
 * Escrita de código portável com compilação condicional
 * Testes automatizados sem framework externo
@@ -360,8 +372,8 @@ Este projeto demonstra:
 
 * Senha armazenada com **hash** (ex.: Argon2/bcrypt via libsodium) e cadastro de usuários
 * Cadastro dos **cães** de cada cliente (nome, raça, porte) e agenda de passeios
-* Busca por nome (parcial) e listagem ordenada/paginada
-* Exportação de relatórios
+* Listagem ordenada (por nome ou cidade) e paginada
+* Exportação de relatório em HTML (página estática gerada pelo próprio programa em C)
 * Integração contínua (GitHub Actions) rodando `make test` em Linux e Windows
 * Verificação de memória com Valgrind/AddressSanitizer na pipeline
 * Migração opcional para SQLite caso o volume de dados cresça
