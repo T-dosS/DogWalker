@@ -52,7 +52,7 @@ test: $(TEST_BIN)
 $(TEST_BIN): $(TEST_SRC) $(LIB_SRC) $(HEADERS)
 	$(CC) $(CFLAGS) $(TEST_SRC) $(LIB_SRC) -o $@
 
-# Simula um usuário digitando (28 cenários) e confere mensagens e o CSV.
+# Simula um usuário digitando (36 cenários) e confere mensagens e o CSV.
 cenarios: $(BIN)
 	powershell -NoProfile -ExecutionPolicy Bypass -File tests/cenarios.ps1
 

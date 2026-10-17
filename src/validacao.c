@@ -288,6 +288,75 @@ int converter_inteiro(const char *texto, int *valor)
     return 1;
 }
 
+/**
+ * Letra sem acento para U+00C0–U+00DF (maiúsculas) e U+00E0–U+00FF
+ * (minúsculas), que diferem só pelo bit 0x20: por isso basta uma tabela
+ * de 32 posições. '.' marca símbolos sem letra base (Æ, ×, ÷, Þ, ß...),
+ * que são mantidos como estão.
+ */
+static const char LETRAS_SEM_ACENTO[] = "aaaaaa.ceeeeiiiidnooooo.ouuuuy..";
+
+/** @return quantos bytes tem o caractere UTF-8 que começa com `inicial`. */
+static size_t bytes_do_caractere(unsigned char inicial)
+{
+    if (inicial >= 0xF0) {
+        return 4;
+    }
+    if (inicial >= 0xE0) {
+        return 3;
+    }
+    if (inicial >= 0xC0) {
+        return 2;
+    }
+    return 1; /* ASCII ou byte solto (UTF-8 malformado): copiado sozinho */
+}
+
+void texto_para_comparacao(const char *entrada, char *saida, size_t tamanho)
+{
+    size_t usados = 0;
+    const char *p = entrada;
+
+    if (tamanho == 0) {
+        return;
+    }
+    while (*p != '\0') {
+        unsigned char c = (unsigned char)p[0];
+        unsigned char seguinte = (unsigned char)p[1];
+        size_t bytes;
+        size_t i;
+
+        /* Letras acentuadas do Latin-1 são codificadas como 0xC3 0x80..0xBF. */
+        if (c == 0xC3 && seguinte >= 0x80 && seguinte <= 0xBF
+            && LETRAS_SEM_ACENTO[seguinte & 0x1F] != '.') {
+            if (usados + 1 >= tamanho) {
+                break;
+            }
+            saida[usados++] = LETRAS_SEM_ACENTO[seguinte & 0x1F];
+            p += 2;
+            continue;
+        }
+
+        bytes = bytes_do_caractere(c);
+        for (i = 1; i < bytes; i++) {
+            if (p[i] == '\0') {
+                bytes = i; /* sequência cortada no fim do texto */
+                break;
+            }
+        }
+        if (usados + bytes >= tamanho) {
+            break; /* não corta um caractere pela metade */
+        }
+        if (bytes == 1) {
+            saida[usados++] = (char)tolower(c);
+        } else {
+            memcpy(saida + usados, p, bytes);
+            usados += bytes;
+        }
+        p += bytes;
+    }
+    saida[usados] = '\0';
+}
+
 void formatar_cpf(const char *cpf, char *saida, size_t tamanho)
 {
     snprintf(saida, tamanho, "%.3s.%.3s.%.3s-%.2s", cpf, cpf + 3, cpf + 6, cpf + 9);
