@@ -438,6 +438,44 @@ static void testar_filtro(void)
     VERIFICAR(!cliente_corresponde(&c, "Bruno"));
     VERIFICAR(!cliente_corresponde(&c, "111.444"));
     VERIFICAR(!cliente_corresponde(&c, "529982247250000")); /* dígitos demais */
+
+    /* Acentos e caixa são ignorados nos dois sentidos. */
+    VERIFICAR(cliente_corresponde(&c, "sao"));
+    VERIFICAR(cliente_corresponde(&c, "SÃO PAULO"));
+    VERIFICAR(cliente_corresponde(&c, "Paulo"));
+    VERIFICAR(!cliente_corresponde(&c, "são joão"));
+    snprintf(c.nome, sizeof c.nome, "%s", "Cláudia Conceição");
+    VERIFICAR(cliente_corresponde(&c, "claudia conceicao"));
+    VERIFICAR(cliente_corresponde(&c, "ÇÃO"));
+}
+
+static void testar_texto_para_comparacao(void)
+{
+    char saida[64];
+    char pequeno[4];
+
+    texto_para_comparacao("São João", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "sao joao") == 0);
+    texto_para_comparacao("ÁÀÂÃÄ áàâãä ÉÊÍÓÔÕÚÜ Çç Ññ", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "aaaaa aaaaa eeiooouu cc nn") == 0);
+    texto_para_comparacao("ANA@Example.COM", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "ana@example.com") == 0);
+    texto_para_comparacao("", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "") == 0);
+
+    /* Sem letra base: o caractere é mantido como está. */
+    texto_para_comparacao("Æ×ß─", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "Æ×ß─") == 0);
+
+    /* Truncamento nunca corta um caractere de vários bytes ao meio. */
+    texto_para_comparacao("Ação", pequeno, sizeof pequeno);
+    VERIFICAR(strcmp(pequeno, "aca") == 0);
+    texto_para_comparacao("ab─", pequeno, sizeof pequeno);
+    VERIFICAR(strcmp(pequeno, "ab") == 0);
+
+    /* UTF-8 malformado (byte inicial no fim do texto) não lê além do '\0'. */
+    texto_para_comparacao("a\xC3", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "a\xC3") == 0);
 }
 
 static void testar_largura_e_truncamento(void)
@@ -486,7 +524,8 @@ int main(void)
         {"Arquivo com BOM UTF-8 e quebras CRLF", testar_crlf_e_bom},
         {"Gravação em pasta inexistente retorna erro", testar_pasta_inexistente},
         {"500 clientes: gravação e leitura", testar_muitos_clientes},
-        {"Filtro da listagem: nome, cidade, UF, e-mail e CPF", testar_filtro},
+        {"Filtro da listagem: nome, cidade, UF, e-mail, CPF e acentos", testar_filtro},
+        {"Texto para comparação: minúsculas, sem acentos e UTF-8 seguro", testar_texto_para_comparacao},
         {"Interface: largura UTF-8 e truncamento sem cortar acentos", testar_largura_e_truncamento},
     };
     size_t i;

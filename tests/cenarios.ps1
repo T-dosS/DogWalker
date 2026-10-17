@@ -83,6 +83,7 @@ Rodar 'Cadastro de 2 clientes adicionais' @('admin','admin',
 Rodar 'Listagem com filtro (nome)' @('admin','admin','3','bruno','','5') @('Filtro: "bruno"','Exibindo 1 de 3','| 2   | Bruno Lima')
 Rodar 'Listagem com filtro (CPF com máscara)' @('admin','admin','3','123.456','','5') @('Filtro: "123.456"','Exibindo 1 de 3','| 3   | Cláudia Conceição')
 Rodar 'Listagem: filtro sem resultado' @('admin','admin','3','zzz','','5') @('Nenhum cliente corresponde ao filtro','Exibindo 0 de 3')
+Rodar 'Listagem: filtro ignora acentos' @('admin','admin','3','conceicao','','5') @('Filtro: "conceicao"','Exibindo 1 de 3','| 3   | Cláudia Conceição')
 Rodar 'Atalhos por letra (l = listar, s = sair)' @('admin','admin','l','','s') @('Total: 3 cliente(s)','Fim da execução')
 
 # --- Alteração -------------------------------------------------------------

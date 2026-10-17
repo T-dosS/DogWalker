@@ -99,28 +99,21 @@ int clientes_iguais(const Cliente *a, const Cliente *b)
         && strcmp(a->cep, b->cep) == 0;
 }
 
-/**
- * Procura `termo` dentro de `texto` sem diferenciar maiúsculas/minúsculas.
- * Compara byte a byte com tolower(), o que cobre letras sem acento
- * ("ana" encontra "Ana"); letras acentuadas precisam coincidir exatamente.
- */
-static int contem_ignorando_caixa(const char *texto, const char *termo)
-{
-    size_t tamanho_termo = strlen(termo);
-    size_t i;
-    size_t j;
+/* Cabe qualquer campo de texto do cliente (o maior tem 100 bytes). Um termo
+ * de busca maior que isso não pode estar contido em nenhum campo. */
+#define TAM_COMPARACAO 128
 
-    for (i = 0; texto[i] != '\0'; i++) {
-        for (j = 0; j < tamanho_termo && texto[i + j] != '\0'; j++) {
-            if (tolower((unsigned char)texto[i + j]) != tolower((unsigned char)termo[j])) {
-                break;
-            }
-        }
-        if (j == tamanho_termo) {
-            return 1;
-        }
-    }
-    return 0;
+/**
+ * Procura `termo_comparavel` (já em minúsculas e sem acentos) dentro de
+ * `texto`, convertido da mesma forma: "sao" encontra "São Paulo" e
+ * "SÃO" encontra "sao".
+ */
+static int contem_para_busca(const char *texto, const char *termo_comparavel)
+{
+    char comparavel[TAM_COMPARACAO];
+
+    texto_para_comparacao(texto, comparavel, sizeof comparavel);
+    return strstr(comparavel, termo_comparavel) != NULL;
 }
 
 /**
@@ -152,11 +145,18 @@ int cliente_corresponde(const Cliente *cliente, const char *termo)
     if (termo == NULL || termo[0] == '\0') {
         return 1;
     }
-    return contem_ignorando_caixa(cliente->nome, termo)
-        || contem_ignorando_caixa(cliente->email, termo)
-        || contem_ignorando_caixa(cliente->cidade, termo)
-        || contem_ignorando_caixa(cliente->estado, termo)
-        || corresponde_cpf(cliente->cpf, termo);
+    if (strlen(termo) < TAM_COMPARACAO) {
+        char termo_comparavel[TAM_COMPARACAO];
+
+        texto_para_comparacao(termo, termo_comparavel, sizeof termo_comparavel);
+        if (contem_para_busca(cliente->nome, termo_comparavel)
+            || contem_para_busca(cliente->email, termo_comparavel)
+            || contem_para_busca(cliente->cidade, termo_comparavel)
+            || contem_para_busca(cliente->estado, termo_comparavel)) {
+            return 1;
+        }
+    }
+    return corresponde_cpf(cliente->cpf, termo);
 }
 
 void cliente_exibir(const Cliente *cliente)
