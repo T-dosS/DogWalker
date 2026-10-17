@@ -35,7 +35,7 @@ e a análise detalhada de cada problema está em [`docs/ANALISE_CODIGO_ORIGINAL.
 |----------------|-----------|
 | 🔐 **Login** | Usuário e senha, senha mascarada com `*` (Backspace funciona), máximo de 3 tentativas |
 | ➕ **Cadastro** | CPF validado (dígitos verificadores), sem duplicidade, todos os campos validados, confirmação antes de gravar |
-| 📋 **Listagem** | Tabela com bordas e filtro por nome, cidade, UF, CPF (com ou sem máscara) ou e-mail |
+| 📋 **Listagem** | Tabela com bordas, filtro por nome, cidade, UF, CPF (com ou sem máscara) ou e-mail, sem diferenciar acentos, e ordenação por nome ou cidade |
 | ✏️ **Alteração** | Busca por CPF, mostra os dados atuais, ENTER mantém o valor, confirmação antes de gravar |
 | 🗑️ **Remoção** | Busca por CPF, mostra os dados, pede confirmação e remove apenas aquele cliente |
 | 💾 **Persistência** | Arquivo CSV (`data/clientes.csv`) com gravação segura via arquivo temporário |
@@ -177,7 +177,7 @@ Erros de compilação aparecem na aba **Problemas** com link para a linha.
 | `make` | Compila o programa e gera `dogwalker` (`dogwalker.exe` no Windows) |
 | `make run` | Compila se necessário, garante que a pasta `data/` existe e executa |
 | `make test` | Compila e executa os testes automatizados; retorna erro se algum falhar |
-| `make cenarios` | Executa os 28 testes de uso ponta a ponta (Windows/PowerShell) |
+| `make cenarios` | Executa os 36 testes de uso ponta a ponta (Windows/PowerShell) |
 | `make clean` | Remove os executáveis gerados |
 
 No Windows, troque `make` por `mingw32-make`.
@@ -225,7 +225,8 @@ cp data/clientes_exemplo.csv data/clientes.csv
 | Menu | `1`–`5` | Abre a opção direto, sem Enter |
 | Menu | `C` `A` `L` `R` `S` | **C**adastrar, **A**lterar, **L**istar, **R**emover, **S**air |
 | Menu | `Esc` | Encerra o programa |
-| Listagem | texto + `Enter` | Filtra por nome, cidade, UF, CPF ou e-mail |
+| Listagem | texto + `Enter` | Filtra por nome, cidade, UF, CPF ou e-mail (acentos opcionais: "sao" encontra "São") |
+| Listagem | `/n` `/c` `/o` + `Enter` | Ordena por **n**ome, por **c**idade ou volta à **o**rdem de cadastro (o filtro é mantido) |
 | Listagem | `Enter` vazio | Volta ao menu |
 | Senha | `Backspace` | Apaga o último caractere |
 | Qualquer pergunta | `Ctrl+Z` (Windows) / `Ctrl+D` (Linux) | Encerra |
@@ -292,7 +293,8 @@ sem interação humana:
 * Arquivo com BOM UTF-8 e quebras de linha CRLF (salvo pelo Excel/Bloco de Notas)
 * Gravação em pasta inexistente (deve retornar erro)
 * 500 clientes gravados e lidos
-* Filtro da listagem (maiúsculas/minúsculas, acentos, UF, e-mail, CPF com máscara)
+* Filtro da listagem (maiúsculas/minúsculas, com ou sem acentos, UF, e-mail, CPF com máscara)
+* Ordenação da listagem por nome e por cidade (acentos, empates e lista original intacta)
 * Interface: largura de textos UTF-8 e truncamento sem cortar caracteres acentuados
 
 Saída esperada (resumida):
@@ -304,7 +306,7 @@ Executando testes do DogWalker...
   ...
   [ OK ] Interface: largura UTF-8 e truncamento sem cortar acentos
 
-1244 verificações, 0 falha(s).
+1273 verificações, 0 falha(s).
 ```
 
 ### Testes de cenário (Windows)
@@ -314,7 +316,7 @@ mingw32-make cenarios
 ```
 
 O script [`tests/cenarios.ps1`](tests/cenarios.ps1) executa o programa com entradas
-redirecionadas e simula 28 usos completos: login, cadastro com erros, filtro, alteração, remoção,
+redirecionadas e simula 36 usos completos: login, cadastro com erros, filtro, ordenação, alteração, remoção,
 arquivo vazio/corrompido, pasta inexistente e fim de entrada. Ele também confere no CSV que
 a alteração e a remoção afetaram **só** o cliente escolhido.
 
@@ -389,7 +391,7 @@ e o histórico de cada versão em [`CHANGELOG.md`](CHANGELOG.md). Em resumo:
 
 * Senha armazenada com **hash** (ex.: Argon2/bcrypt via libsodium) e cadastro de usuários
 * Cadastro dos **cães** de cada cliente (nome, raça, porte) e agenda de passeios
-* Listagem ordenada (por nome ou cidade) e paginada
+* Listagem paginada e tela de detalhes do cliente
 * Exportação de relatório em HTML (página estática gerada pelo próprio programa em C)
 * Integração contínua (GitHub Actions) rodando `make test` em Linux e Windows
 * Verificação de memória com Valgrind/AddressSanitizer na pipeline

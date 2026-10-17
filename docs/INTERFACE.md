@@ -11,7 +11,7 @@ proposta do projeto (um portfólio de **linguagem C**) e sem adicionar complexid
 | Arquitetura | `menu.c` misturava navegação e telas; o único recurso visual era um título entre linhas `=====` |
 | Entrada | Tudo por linha (`fgets`). A leitura tecla a tecla já existia só para a senha (`*`) |
 | Ambiente | Windows 11 e terminais modernos (Windows Terminal, VS Code, Linux, macOS) entendem sequências ANSI e Unicode |
-| Restrição | 28 cenários e os testes automatizados rodam com entrada/saída **redirecionadas** (sem terminal real) |
+| Restrição | 36 cenários e os testes automatizados rodam com entrada/saída **redirecionadas** (sem terminal real) |
 
 ## 2. Alternativas
 
@@ -75,8 +75,8 @@ do Windows, "negrito + preto" vira cinza e perde contraste (detectado nas captur
 ## 7. Como foi validado
 
 * Compilação sem warnings com `-Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -fanalyzer`.
-* 1244 verificações automatizadas, incluindo filtro e truncamento UTF-8.
-* 28 cenários de uso com entrada redirecionada, no modo simples.
+* 1273 verificações automatizadas, incluindo filtro sem acentos, ordenação e truncamento UTF-8.
+* 36 cenários de uso com entrada redirecionada, no modo simples.
 * Console real do Windows: teclas simuladas (setas, Esc, atalhos) e telas capturadas **com cores**.
   As imagens em `docs/img/` são dessas capturas.
 * O código específico do Linux/macOS (sequência `ESC [ A/B`) segue o padrão POSIX `termios`, mas

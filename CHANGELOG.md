@@ -10,6 +10,18 @@ Categorias usadas: **Adicionado**, **Alterado**, **Corrigido**, **Segurança**, 
 
 Mudanças prontas que ainda não viraram versão.
 
+### Adicionado
+- Ordenação da listagem: `/n` ordena por nome, `/c` por cidade (depois UF e nome) e `/o`
+  volta à ordem de cadastro. Só a exibição muda; o CSV e a coluna `#` continuam na ordem de cadastro.
+- `texto_para_comparacao`: forma minúscula e sem acentos de um texto UTF-8, usada no filtro
+  e na ordenação.
+- 8 cenários e 29 verificações automatizadas novas (36 cenários e 1273 verificações no total).
+
+### Alterado
+- O filtro da listagem ignora acentos: "sao" encontra "São Paulo" e "SÃO" encontra "sao".
+- A listagem avisa quando o texto digitado é longo demais ou o comando de ordenação não existe,
+  em vez de ignorar a entrada em silêncio.
+
 ## [1.2.0] - 2026-10-16
 
 ### Adicionado
