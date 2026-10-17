@@ -159,6 +159,67 @@ int cliente_corresponde(const Cliente *cliente, const char *termo)
     return corresponde_cpf(cliente->cpf, termo);
 }
 
+/* qsort() não recebe um parâmetro extra para o comparador, então a ordem
+ * pedida fica nesta variável durante a ordenação (o programa não usa threads). */
+static OrdemListagem ordem_atual = ORDEM_CADASTRO;
+
+/** Compara dois textos ignorando maiúsculas e acentos. */
+static int comparar_textos(const char *a, const char *b)
+{
+    char comparavel_a[TAM_COMPARACAO];
+    char comparavel_b[TAM_COMPARACAO];
+
+    texto_para_comparacao(a, comparavel_a, sizeof comparavel_a);
+    texto_para_comparacao(b, comparavel_b, sizeof comparavel_b);
+    return strcmp(comparavel_a, comparavel_b);
+}
+
+static int comparar_clientes(const void *pa, const void *pb)
+{
+    const Cliente *a = *(const Cliente *const *)pa;
+    const Cliente *b = *(const Cliente *const *)pb;
+    int resultado = 0;
+
+    if (ordem_atual == ORDEM_CIDADE) {
+        resultado = comparar_textos(a->cidade, b->cidade);
+        if (resultado == 0) {
+            resultado = strcmp(a->estado, b->estado);
+        }
+    }
+    if (resultado == 0 && ordem_atual != ORDEM_CADASTRO) {
+        resultado = comparar_textos(a->nome, b->nome);
+    }
+    if (resultado == 0) {
+        /* Desempate pela posição no vetor: qsort não é estável, e assim
+         * clientes com o mesmo nome continuam na ordem de cadastro. */
+        resultado = (a > b) - (a < b);
+    }
+    return resultado;
+}
+
+const Cliente **lista_criar_visao(const ListaClientes *lista, OrdemListagem ordem)
+{
+    const Cliente **visao;
+    size_t i;
+
+    if (lista->quantidade == 0) {
+        return NULL;
+    }
+    visao = malloc(lista->quantidade * sizeof *visao);
+    if (visao == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < lista->quantidade; i++) {
+        visao[i] = &lista->itens[i];
+    }
+    if (ordem != ORDEM_CADASTRO) {
+        ordem_atual = ordem;
+        qsort(visao, lista->quantidade, sizeof *visao, comparar_clientes);
+        ordem_atual = ORDEM_CADASTRO;
+    }
+    return visao;
+}
+
 void cliente_exibir(const Cliente *cliente)
 {
     const char *rotulo = ui_codigo(UI_COR_ROTULO);

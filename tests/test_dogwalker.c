@@ -17,6 +17,7 @@
 #include "validacao.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int total_verificacoes = 0;
@@ -478,6 +479,64 @@ static void testar_texto_para_comparacao(void)
     VERIFICAR(strcmp(saida, "a\xC3") == 0);
 }
 
+static void testar_ordenacao(void)
+{
+    ListaClientes lista;
+    const Cliente **visao;
+    Cliente c;
+
+    lista_iniciar(&lista);
+    VERIFICAR(lista_criar_visao(&lista, ORDEM_NOME) == NULL); /* lista vazia */
+
+    c = criar_cliente(CPF_A, "bruno Lima");
+    snprintf(c.cidade, sizeof c.cidade, "%s", "Rio de Janeiro");
+    snprintf(c.estado, sizeof c.estado, "%s", "RJ");
+    lista_adicionar(&lista, &c);
+    c = criar_cliente(CPF_B, "Álvaro Dias");
+    snprintf(c.cidade, sizeof c.cidade, "%s", "São Paulo");
+    lista_adicionar(&lista, &c);
+    c = criar_cliente(CPF_C, "Ana Souza");
+    snprintf(c.cidade, sizeof c.cidade, "%s", "Campinas");
+    lista_adicionar(&lista, &c);
+    c = criar_cliente(CPF_A, "Ana Souza"); /* nome repetido: desempate */
+    snprintf(c.cidade, sizeof c.cidade, "%s", "Santos");
+    lista_adicionar(&lista, &c);
+
+    visao = lista_criar_visao(&lista, ORDEM_CADASTRO);
+    VERIFICAR(visao != NULL);
+    if (visao != NULL) {
+        VERIFICAR(visao[0] == &lista.itens[0] && visao[3] == &lista.itens[3]);
+        free(visao);
+    }
+
+    /* "Álvaro" fica entre os "A" e "bruno" minúsculo não vai para o fim. */
+    visao = lista_criar_visao(&lista, ORDEM_NOME);
+    VERIFICAR(visao != NULL);
+    if (visao != NULL) {
+        VERIFICAR(visao[0] == &lista.itens[1]); /* Álvaro          */
+        VERIFICAR(visao[1] == &lista.itens[2]); /* Ana (cadastrada antes) */
+        VERIFICAR(visao[2] == &lista.itens[3]); /* Ana             */
+        VERIFICAR(visao[3] == &lista.itens[0]); /* bruno           */
+        free(visao);
+    }
+
+    /* Cidade: Campinas, Rio de Janeiro, Santos, São Paulo. */
+    visao = lista_criar_visao(&lista, ORDEM_CIDADE);
+    VERIFICAR(visao != NULL);
+    if (visao != NULL) {
+        VERIFICAR(visao[0] == &lista.itens[2]);
+        VERIFICAR(visao[1] == &lista.itens[0]);
+        VERIFICAR(visao[2] == &lista.itens[3]);
+        VERIFICAR(visao[3] == &lista.itens[1]);
+        free(visao);
+    }
+
+    /* A ordenação não altera a lista (nem o que será gravado no CSV). */
+    VERIFICAR(strcmp(lista.itens[0].nome, "bruno Lima") == 0);
+    VERIFICAR(strcmp(lista.itens[1].nome, "Álvaro Dias") == 0);
+    lista_liberar(&lista);
+}
+
 static void testar_largura_e_truncamento(void)
 {
     char saida[64];
@@ -526,6 +585,7 @@ int main(void)
         {"500 clientes: gravação e leitura", testar_muitos_clientes},
         {"Filtro da listagem: nome, cidade, UF, e-mail, CPF e acentos", testar_filtro},
         {"Texto para comparação: minúsculas, sem acentos e UTF-8 seguro", testar_texto_para_comparacao},
+        {"Ordenação da listagem por nome e cidade", testar_ordenacao},
         {"Interface: largura UTF-8 e truncamento sem cortar acentos", testar_largura_e_truncamento},
     };
     size_t i;

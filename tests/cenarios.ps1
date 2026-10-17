@@ -39,10 +39,24 @@ function Rodar([string]$nome, [string[]]$linhas, [string[]]$esperado,
     $script:total++
     [IO.File]::WriteAllText($entrada, (($linhas -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding $false))
     $saida = cmd /c "`"$exe`" `"$arquivo`" < `"$entrada`"" | Out-String
+    $script:ultimaSaida = $saida
     $ok = $true
     foreach ($e in $esperado) { if ($saida -notlike "*$e*") { $ok = $false; Write-Output "    faltou: '$e'" } }
     foreach ($p in $proibido) { if ($saida -like "*$p*") { $ok = $false; Write-Output "    não deveria ter: '$p'" } }
     if ($ok) { Write-Output "[ OK ] $nome" } else { $script:falhas++; Write-Output "[FALHA] $nome"; Write-Output $saida }
+}
+
+# Confere se, na saída do último cenário e depois do texto $marcador, os
+# trechos aparecem exatamente na ordem dada (usado na ordenação da listagem).
+function EmOrdem([string]$marcador, [string[]]$trechos) {
+    $posicao = $script:ultimaSaida.LastIndexOf($marcador)
+    if ($posicao -lt 0) { return $false }
+    foreach ($t in $trechos) {
+        $proxima = $script:ultimaSaida.IndexOf($t, $posicao)
+        if ($proxima -lt 0) { return $false }
+        $posicao = $proxima + $t.Length
+    }
+    return $true
 }
 
 function Verificar([string]$nome, [bool]$condicao) {
@@ -84,6 +98,15 @@ Rodar 'Listagem com filtro (nome)' @('admin','admin','3','bruno','','5') @('Filt
 Rodar 'Listagem com filtro (CPF com máscara)' @('admin','admin','3','123.456','','5') @('Filtro: "123.456"','Exibindo 1 de 3','| 3   | Cláudia Conceição')
 Rodar 'Listagem: filtro sem resultado' @('admin','admin','3','zzz','','5') @('Nenhum cliente corresponde ao filtro','Exibindo 0 de 3')
 Rodar 'Listagem: filtro ignora acentos' @('admin','admin','3','conceicao','','5') @('Filtro: "conceicao"','Exibindo 1 de 3','| 3   | Cláudia Conceição')
+Rodar 'Listagem ordenada por cidade' @('admin','admin','3','/c','','5') @('Ordenado por cidade','Exibindo 3 de 3')
+Verificar 'Ordem por cidade: Belo Horizonte, Campinas, Rio de Janeiro' (EmOrdem 'Ordenado por cidade' @('| 3   | Cláudia','| 1   | José','| 2   | Bruno'))
+Rodar 'Listagem ordenada por nome e de volta ao cadastro' @('admin','admin','3','/n','/o','','5') @('Ordenado por nome','Exibindo 3 de 3')
+Verificar 'Ordem por nome: Bruno, Cláudia, José' (EmOrdem 'Ordenado por nome' @('| 2   | Bruno','| 3   | Cláudia','| 1   | José'))
+# Três telas: cadastro, nome e (depois do /o) cadastro de novo, sem o aviso de ordem.
+$telas = $script:ultimaSaida -split 'Ordenar: /n'
+Verificar 'Ordem de cadastro restaurada com /o' ($telas.Count -eq 4 -and $telas[1] -like '*Ordenado por nome*' -and $telas[2] -notlike '*Ordenado por*' -and $telas[2] -like '*Exibindo 3 de 3*' -and $telas[2].IndexOf('| 1   | José') -ge 0 -and $telas[2].IndexOf('| 1   | José') -lt $telas[2].IndexOf('| 2   | Bruno'))
+Rodar 'Listagem: ordem mantém o filtro' @('admin','admin','3','a','/c','','5') @('Filtro: "a"','Ordenado por cidade')
+Rodar 'Listagem: comando desconhecido e texto longo' @('admin','admin','3','/x',('x'*300),'','5') @('Comando desconhecido. Use /n, /c ou /o','Texto muito longo. O filtro anterior foi mantido','Exibindo 3 de 3') @('Filtro: "')
 Rodar 'Atalhos por letra (l = listar, s = sair)' @('admin','admin','l','','s') @('Total: 3 cliente(s)','Fim da execução')
 
 # --- Alteração -------------------------------------------------------------

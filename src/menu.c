@@ -23,6 +23,7 @@
 #include "validacao.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* Opções na ordem em que aparecem no menu (índices de ITENS_MENU). */
@@ -323,12 +324,14 @@ static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
 }
 
 /**
- * Desenha a tabela com os clientes que correspondem ao filtro.
- * A coluna "#" mostra a posição do cliente na lista completa.
+ * Desenha a tabela com os clientes que correspondem ao filtro, na ordem da
+ * `visao` (ou na ordem de cadastro, se ela for NULL). A coluna "#" mostra
+ * sempre a posição do cliente na lista completa, qualquer que seja a ordem.
  *
  * @return quantos clientes foram exibidos.
  */
-static size_t exibir_tabela_clientes(const ListaClientes *lista, const char *filtro)
+static size_t exibir_tabela_clientes(const ListaClientes *lista, const Cliente *const *visao,
+                                     const char *filtro)
 {
     static const char *const TITULOS[COLUNAS_TABELA] = {"#", "Nome", "CPF", "Cidade/UF"};
     size_t exibidos = 0;
@@ -339,7 +342,7 @@ static size_t exibir_tabela_clientes(const ListaClientes *lista, const char *fil
     ui_tabela_divisoria(LARGURAS_TABELA, COLUNAS_TABELA);
 
     for (i = 0; i < lista->quantidade; i++) {
-        const Cliente *c = &lista->itens[i];
+        const Cliente *c = (visao != NULL) ? visao[i] : &lista->itens[i];
         char posicao[12];
         char cpf[TAM_CPF_FORMATADO];
         char cidade_uf[TAM_CIDADE + TAM_ESTADO + 1];
@@ -348,7 +351,7 @@ static size_t exibir_tabela_clientes(const ListaClientes *lista, const char *fil
         if (!cliente_corresponde(c, filtro)) {
             continue;
         }
-        snprintf(posicao, sizeof posicao, "%u", (unsigned)(i + 1));
+        snprintf(posicao, sizeof posicao, "%u", (unsigned)(c - lista->itens + 1));
         formatar_cpf(c->cpf, cpf, sizeof cpf);
         snprintf(cidade_uf, sizeof cidade_uf, "%s/%s", c->cidade, c->estado);
 
@@ -365,14 +368,61 @@ static size_t exibir_tabela_clientes(const ListaClientes *lista, const char *fil
 }
 
 /**
- * Listagem em tabela com filtro. A própria pergunta do filtro faz o papel
- * da pausa: ENTER vazio volta ao menu; um termo refaz a tabela filtrada.
+ * Interpreta os comandos de ordenação da listagem ("/n", "/c", "/o",
+ * sem diferenciar maiúsculas). Começam com '/' porque nenhum campo
+ * pesquisado pelo filtro começa assim, então não há ambiguidade.
+ *
+ * @return 1 se reconheceu o comando (ordem gravada em *ordem), 0 se não.
+ */
+static int ler_comando_ordem(const char *entrada, OrdemListagem *ordem)
+{
+    if (entrada[0] != '/' || entrada[1] == '\0' || entrada[2] != '\0') {
+        return 0;
+    }
+    switch (entrada[1]) {
+    case 'n':
+    case 'N':
+        *ordem = ORDEM_NOME;
+        return 1;
+    case 'c':
+    case 'C':
+        *ordem = ORDEM_CIDADE;
+        return 1;
+    case 'o':
+    case 'O':
+        *ordem = ORDEM_CADASTRO;
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static const char *descrever_ordem(OrdemListagem ordem)
+{
+    switch (ordem) {
+    case ORDEM_NOME:
+        return "nome";
+    case ORDEM_CIDADE:
+        return "cidade";
+    case ORDEM_CADASTRO:
+        break;
+    }
+    return "cadastro";
+}
+
+/**
+ * Listagem em tabela com filtro e ordenação. A própria pergunta do filtro
+ * faz o papel da pausa: ENTER vazio volta ao menu; um termo refaz a tabela
+ * filtrada; "/n", "/c" e "/o" mudam a ordem e mantêm o filtro atual.
  */
 static void listar_clientes(ListaClientes *lista, const char *caminho)
 {
     char filtro[TAM_ENTRADA] = "";
     char entrada[TAM_ENTRADA];
     char rotulo[TAM_ENTRADA];
+    const char *aviso = NULL; /* mostrado depois da tabela redesenhada */
+    OrdemListagem ordem = ORDEM_CADASTRO;
+    const Cliente **visao = NULL;
     int primeira_vez = 1;
 
     (void)caminho; /* a listagem não grava nada */
@@ -392,6 +442,7 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
     for (;;) {
         size_t exibidos;
         ResultadoEntrada leitura;
+        OrdemListagem nova_ordem;
 
         if (!primeira_vez) {
             ui_cabecalho("LISTA DE CLIENTES"); /* redesenha a tela já filtrada */
@@ -402,23 +453,50 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
         if (filtro[0] != '\0') {
             ui_info("Filtro: \"%s\"", filtro);
         }
-        exibidos = exibir_tabela_clientes(lista, filtro);
+        if (ordem != ORDEM_CADASTRO) {
+            ui_info("Ordenado por %s.", descrever_ordem(ordem));
+        }
+        exibidos = exibir_tabela_clientes(lista, visao, filtro);
 
         if (exibidos == 0) {
             ui_aviso("Nenhum cliente corresponde ao filtro.");
         }
+        if (aviso != NULL) {
+            ui_aviso("%s", aviso);
+            aviso = NULL;
+        }
         printf("  %sExibindo %u de %u.%s Total: %u cliente(s) cadastrado(s).\n",
                ui_codigo(UI_COR_SUAVE), (unsigned)exibidos, (unsigned)lista->quantidade,
                ui_codigo(UI_COR_NORMAL), (unsigned)lista->quantidade);
+        printf("  %sOrdenar: /n nome   /c cidade   /o ordem de cadastro%s\n",
+               ui_codigo(UI_COR_SUAVE), ui_codigo(UI_COR_NORMAL));
 
         leitura = ler_linha(rotulo, entrada, sizeof entrada);
         if (leitura == ENTRADA_FIM || leitura == ENTRADA_VAZIA) {
-            return;
+            break;
         }
-        if (leitura == ENTRADA_OK) {
+        if (leitura == ENTRADA_LONGA) {
+            aviso = "Texto muito longo. O filtro anterior foi mantido.";
+        } else if (ler_comando_ordem(entrada, &nova_ordem)) {
+            /* A lista não muda durante a listagem: basta recriar a visão
+             * quando a ordem muda. */
+            free(visao);
+            visao = NULL;
+            ordem = nova_ordem;
+            if (ordem != ORDEM_CADASTRO) {
+                visao = lista_criar_visao(lista, ordem);
+                if (visao == NULL) {
+                    ordem = ORDEM_CADASTRO;
+                    aviso = "Memória insuficiente para ordenar. Exibindo na ordem de cadastro.";
+                }
+            }
+        } else if (entrada[0] == '/') {
+            aviso = "Comando desconhecido. Use /n, /c ou /o para ordenar.";
+        } else {
             snprintf(filtro, sizeof filtro, "%s", entrada);
         }
     }
+    free(visao);
 }
 
 /**

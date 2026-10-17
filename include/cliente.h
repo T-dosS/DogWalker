@@ -111,6 +111,26 @@ int clientes_iguais(const Cliente *a, const Cliente *b);
  */
 int cliente_corresponde(const Cliente *cliente, const char *termo);
 
+/** Ordens disponíveis para exibir a lista (o arquivo não muda). */
+typedef enum {
+    ORDEM_CADASTRO, /**< ordem do arquivo, a mesma do cadastro        */
+    ORDEM_NOME,     /**< nome em ordem alfabética                      */
+    ORDEM_CIDADE    /**< cidade, depois UF e nome, em ordem alfabética */
+} OrdemListagem;
+
+/**
+ * Cria uma "visão" ordenada da lista: um vetor de ponteiros para os
+ * clientes, na ordem pedida. A lista em si não é modificada, então a
+ * posição original de cada cliente continua sendo `visao[i] - lista->itens`.
+ *
+ * A comparação ignora maiúsculas e acentos ("Álvaro" vem antes de "Bruno").
+ * Empates mantêm a ordem de cadastro, para o resultado ser sempre o mesmo.
+ *
+ * @return vetor com lista->quantidade ponteiros, que deve ser liberado com
+ *         free(); NULL se a lista estiver vazia ou faltar memória.
+ */
+const Cliente **lista_criar_visao(const ListaClientes *lista, OrdemListagem ordem);
+
 /** Mostra os dados do cliente no terminal, com CPF e CEP formatados. */
 void cliente_exibir(const Cliente *cliente);
 
