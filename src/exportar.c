@@ -126,9 +126,10 @@ static const char ESTILO[] =
     "body{margin:0;background:var(--fundo);color:var(--texto);"
     "font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}"
     "main{max-width:1100px;margin:0 auto;padding:24px 16px}"
-    "header{border-left:6px solid var(--marca);padding:4px 0 4px 16px;margin-bottom:20px}"
-    "h1{margin:0;font-size:1.6rem;color:var(--marca)}"
-    "header p{margin:4px 0 0;color:var(--suave)}"
+    "header{display:flex;align-items:center;gap:14px;margin-bottom:20px}"
+    "header svg{width:44px;height:44px;flex:none;fill:var(--marca)}"
+    "h1{margin:0;font-size:1.6rem;line-height:1.2;color:var(--marca)}"
+    "header p{margin:2px 0 0;color:var(--suave)}"
     ".resumo{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 20px;padding:0;list-style:none}"
     ".resumo li{background:var(--cartao);border:1px solid var(--borda);border-radius:10px;"
     "padding:10px 16px}.resumo strong{display:block;font-size:1.3rem}"
@@ -138,13 +139,20 @@ static const char ESTILO[] =
     "th,td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--borda)}"
     "th{background:var(--zebra);font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}"
     "tbody tr:nth-child(even){background:var(--zebra)}"
-    "td.num{color:var(--suave);font-variant-numeric:tabular-nums}"
+    "td.num{color:var(--suave);font-variant-numeric:tabular-nums;white-space:nowrap}"
+    "td.nome{font-weight:600}"
     "footer{margin-top:20px;color:var(--suave);font-size:.85rem}"
     ".vazio{padding:24px;text-align:center;color:var(--suave)}"
+    /* Celular: cada linha vira um card; "Nº" e nome formam o título. */
     "@media (max-width:700px){thead{position:absolute;left:-9999px}"
-    "table,tbody,tr,td{display:block;width:100%}tr{border-bottom:2px solid var(--borda);padding:8px 0}"
-    "td{border:0;padding:4px 12px}td::before{content:attr(data-rotulo);display:block;"
-    "font-size:.75rem;text-transform:uppercase;color:var(--suave)}}"
+    "table,caption,tbody,tr,td{display:block;width:100%;max-width:100%}"
+    "caption{padding:12px 16px 4px}td{overflow-wrap:anywhere}"
+    "tr{border-bottom:2px solid var(--borda);padding:12px 4px}"
+    "td{border:0;padding:3px 12px}td::before{content:attr(data-rotulo);display:block;"
+    "font-size:.75rem;text-transform:uppercase;color:var(--suave)}"
+    "td:first-child,td.nome{display:inline-block;width:auto;padding-right:0;font-size:1.05rem}"
+    "td:first-child{color:var(--marca);font-weight:600}td:first-child::before{content:'#';display:inline}"
+    "td.nome::before{content:none}}"
     "@media print{body{background:#fff;color:#000}table,.resumo li{border-color:#999}"
     "tbody tr:nth-child(even){background:#f2f2f2}}";
 
@@ -173,7 +181,7 @@ static void escrever_linha_html(FILE *arquivo, const Cliente *c, size_t posicao)
 
     fputs("<tr>", arquivo);
     celula(arquivo, "Nº", numero, "num");
-    celula(arquivo, "Nome", c->nome, NULL);
+    celula(arquivo, "Nome", c->nome, "nome");
     celula(arquivo, "CPF", cpf, "num");
     celula(arquivo, "E-mail", c->email, NULL);
     celula(arquivo, "Endereço", endereco, NULL);
@@ -207,8 +215,14 @@ ResultadoArquivo exportar_html(const char *caminho, const ListaClientes *lista,
           "<meta name=\"color-scheme\" content=\"light dark\">\n"
           "<title>DogWalker - Relatório de clientes</title>\n<style>", arquivo);
     fputs(ESTILO, arquivo);
+    /* Ícone de pata em SVG embutido (decorativo: aria-hidden). */
     fputs("</style>\n</head>\n<body>\n<main>\n<header>\n"
-          "<h1>DogWalker</h1>\n<p>Relatório de clientes</p>\n</header>\n", arquivo);
+          "<svg viewBox=\"0 0 64 64\" aria-hidden=\"true\">"
+          "<ellipse cx=\"32\" cy=\"42\" rx=\"14\" ry=\"12\"/>"
+          "<ellipse cx=\"14\" cy=\"26\" rx=\"6\" ry=\"8\"/><ellipse cx=\"26\" cy=\"14\" rx=\"6\" ry=\"8\"/>"
+          "<ellipse cx=\"38\" cy=\"14\" rx=\"6\" ry=\"8\"/><ellipse cx=\"50\" cy=\"26\" rx=\"6\" ry=\"8\"/>"
+          "</svg>\n<div>\n<h1>DogWalker</h1>\n<p>Relatório de clientes</p>\n</div>\n</header>\n",
+          arquivo);
 
     fprintf(arquivo, "<ul class=\"resumo\">\n<li><strong>%u</strong>no relatório</li>\n"
                      "<li><strong>%u</strong>cadastrados</li>\n",
