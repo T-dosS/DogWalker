@@ -12,6 +12,7 @@
  */
 #include "arquivo.h"
 #include "cliente.h"
+#include "exportar.h"
 #include "terminal.h"
 #include "ui.h"
 #include "validacao.h"
@@ -632,6 +633,138 @@ static void testar_largura_e_truncamento(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* Exportação (relatório HTML e planilha)                              */
+/* ------------------------------------------------------------------ */
+
+#define ARQ_HTML "teste_tmp_relatorio.html"
+#define ARQ_PLANILHA "teste_tmp_planilha.csv"
+
+/** Lê o arquivo inteiro para `destino` (até tamanho-1 bytes). @return bytes lidos. */
+static size_t ler_arquivo(const char *caminho, char *destino, size_t tamanho)
+{
+    FILE *arquivo = fopen(caminho, "rb");
+    size_t lidos = 0;
+
+    destino[0] = '\0';
+    if (arquivo != NULL) {
+        lidos = fread(destino, 1, tamanho - 1, arquivo);
+        destino[lidos] = '\0';
+        fclose(arquivo);
+    }
+    return lidos;
+}
+
+static void testar_escapes_de_exportacao(void)
+{
+    char saida[128];
+    char pequeno[8];
+
+    /* HTML: os 5 caracteres especiais viram entidades; o resto não muda */
+    VERIFICAR(exportar_escapar_html("Ana & Bia", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "Ana &amp; Bia") == 0);
+    VERIFICAR(exportar_escapar_html("<script>alert('x')</script>", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;") == 0);
+    VERIFICAR(exportar_escapar_html("\"São João\"", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "&quot;São João&quot;") == 0);
+    /* sem espaço: para antes da entidade, nunca a corta ao meio */
+    VERIFICAR(!exportar_escapar_html("ab&cd", pequeno, 5));
+    VERIFICAR(strcmp(pequeno, "ab") == 0);
+
+    /* Planilha: só os inícios perigosos ganham apóstrofo */
+    VERIFICAR(exportar_valor_planilha("=HIPERLINK(\"x\")", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "'=HIPERLINK(\"x\")") == 0);
+    VERIFICAR(exportar_valor_planilha("+55 19", saida, sizeof saida) && saida[0] == '\'');
+    VERIFICAR(exportar_valor_planilha("-1", saida, sizeof saida) && saida[0] == '\'');
+    VERIFICAR(exportar_valor_planilha("@soma", saida, sizeof saida) && saida[0] == '\'');
+    VERIFICAR(exportar_valor_planilha("Ana Souza", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "Ana Souza") == 0);
+    VERIFICAR(exportar_valor_planilha("a=b", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "a=b") == 0); /* só o primeiro caractere importa */
+
+    /* CPF mascarado e caminho do arquivo na mesma pasta dos dados */
+    exportar_mascarar_cpf("52998224725", saida, sizeof saida);
+    VERIFICAR(strcmp(saida, "***.982.247-**") == 0);
+    VERIFICAR(exportar_caminho_vizinho("data/clientes.csv", "relatorio.html", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "data/relatorio.html") == 0);
+    VERIFICAR(exportar_caminho_vizinho("C:\\dados\\c.csv", "x.csv", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "C:\\dados\\x.csv") == 0);
+    VERIFICAR(exportar_caminho_vizinho("clientes.csv", "relatorio.html", saida, sizeof saida));
+    VERIFICAR(strcmp(saida, "relatorio.html") == 0);
+    VERIFICAR(!exportar_caminho_vizinho("data/clientes.csv", "relatorio.html", pequeno,
+                                        sizeof pequeno));
+}
+
+static void testar_arquivos_exportados(void)
+{
+    static char conteudo[32768];
+    ListaClientes lista;
+    Cliente a = criar_cliente(CPF_A, "Ana <b>Souza</b>");
+    Cliente b = criar_cliente(CPF_B, "=SOMA(A1)");
+    Cliente c = criar_cliente(CPF_C, "Cláudia");
+    const Cliente *selecao[2];
+
+    lista_iniciar(&lista);
+    lista_adicionar(&lista, &a);
+    lista_adicionar(&lista, &b);
+    lista_adicionar(&lista, &c);
+    /* recorte: só o 3º e o 2º cliente, nessa ordem (como um filtro + ordem) */
+    selecao[0] = &lista.itens[2];
+    selecao[1] = &lista.itens[1];
+
+    /* HTML */
+    VERIFICAR(exportar_html(ARQ_HTML, &lista, selecao, 2, "Recorte de <teste>") == ARQUIVO_OK);
+    ler_arquivo(ARQ_HTML, conteudo, sizeof conteudo);
+    VERIFICAR(strstr(conteudo, "<!DOCTYPE html>") == conteudo);
+    VERIFICAR(strstr(conteudo, "lang=\"pt-BR\"") != NULL);
+    VERIFICAR(strstr(conteudo, "name=\"viewport\"") != NULL);
+    VERIFICAR(strstr(conteudo, "prefers-color-scheme:dark") != NULL);
+    VERIFICAR(strstr(conteudo, "<caption>Recorte de &lt;teste&gt;</caption>") != NULL);
+    VERIFICAR(strstr(conteudo, "<th scope=\"col\">Nome</th>") != NULL);
+    VERIFICAR(strstr(conteudo, "<script") == NULL);     /* nenhum script */
+    VERIFICAR(strstr(conteudo, "Ana &lt;b&gt;") == NULL); /* Ana não está no recorte */
+    VERIFICAR(strstr(conteudo, ">Cláudia<") != NULL);
+    VERIFICAR(strstr(conteudo, "***.456.789-**") != NULL); /* CPF mascarado */
+    VERIFICAR(strstr(conteudo, "123.456.789-09") == NULL);  /* nunca completo */
+    /* "Nº" é a posição de cadastro (3 e 2), não a ordem no recorte */
+    VERIFICAR(strstr(conteudo, "<td data-rotulo=\"Nº\" class=\"num\">3</td>") != NULL);
+    VERIFICAR(strstr(conteudo, "<td data-rotulo=\"Nº\" class=\"num\">2</td>") != NULL);
+    VERIFICAR(strstr(conteudo, "<strong>2</strong>no relatório") != NULL);
+    VERIFICAR(strstr(conteudo, "<strong>3</strong>cadastrados") != NULL);
+
+    /* nome com tags é escapado quando está no recorte */
+    selecao[0] = &lista.itens[0];
+    VERIFICAR(exportar_html(ARQ_HTML, &lista, selecao, 1, NULL) == ARQUIVO_OK);
+    ler_arquivo(ARQ_HTML, conteudo, sizeof conteudo);
+    VERIFICAR(strstr(conteudo, "Ana &lt;b&gt;Souza&lt;/b&gt;") != NULL);
+    VERIFICAR(strstr(conteudo, "<b>Souza") == NULL);
+
+    /* relatório vazio continua válido */
+    VERIFICAR(exportar_html(ARQ_HTML, &lista, selecao, 0, NULL) == ARQUIVO_OK);
+    ler_arquivo(ARQ_HTML, conteudo, sizeof conteudo);
+    VERIFICAR(strstr(conteudo, "Nenhum cliente neste recorte.") != NULL);
+
+    /* Planilha: BOM, cabeçalho, CPF formatado e fórmula neutralizada */
+    selecao[0] = &lista.itens[0];
+    selecao[1] = &lista.itens[1];
+    VERIFICAR(exportar_csv(ARQ_PLANILHA, selecao, 2) == ARQUIVO_OK);
+    ler_arquivo(ARQ_PLANILHA, conteudo, sizeof conteudo);
+    VERIFICAR(strncmp(conteudo, "\xEF\xBB\xBF" "Nome;CPF;", 12) == 0);
+    VERIFICAR(strstr(conteudo, "\r\n'=SOMA(A1);111.444.777-35;") != NULL);
+    VERIFICAR(strstr(conteudo, "\r\nAna <b>Souza</b>;529.982.247-25;") != NULL);
+    VERIFICAR(strstr(conteudo, "13010-000\r\n") != NULL); /* CRLF em qualquer sistema */
+
+    /* pasta inexistente: erro, sem travar */
+    VERIFICAR(exportar_html("pasta_que_nao_existe_123/r.html", &lista, selecao, 1, NULL)
+              == ARQUIVO_ERRO_ESCRITA);
+    VERIFICAR(exportar_csv("pasta_que_nao_existe_123/p.csv", selecao, 1)
+              == ARQUIVO_ERRO_ESCRITA);
+
+    lista_liberar(&lista);
+    remove(ARQ_HTML);
+    remove(ARQ_PLANILHA);
+}
+
+/* ------------------------------------------------------------------ */
 
 typedef struct {
     const char *nome;
@@ -658,6 +791,8 @@ int main(void)
         {"Texto para comparação: minúsculas, sem acentos e UTF-8 seguro", testar_texto_para_comparacao},
         {"Ordenação da listagem por nome e cidade", testar_ordenacao},
         {"Interface: largura UTF-8 e truncamento sem cortar acentos", testar_largura_e_truncamento},
+        {"Exportação: escape HTML, proteção contra fórmulas e CPF mascarado", testar_escapes_de_exportacao},
+        {"Exportação: conteúdo do relatório HTML e da planilha", testar_arquivos_exportados},
     };
     size_t i;
 
