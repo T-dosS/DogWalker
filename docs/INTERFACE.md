@@ -50,6 +50,11 @@ proposta do projeto (um portfólio de **linguagem C**) e sem adicionar complexid
 | Formulários | Rótulos coloridos e valor atual entre colchetes na alteração | `ler_campo` |
 | Limpeza de tela | `ESC[H ESC[2J` no lugar do `system("cls")` original | `ui_limpar_tela` |
 | Restauração | Cor e cursor são restaurados ao sair (`atexit`) | `restaurar_terminal` |
+| Paginação (2.0) | 15 clientes por página, `/+` `/-`, indicador "Página X de Y" | `listar_clientes` |
+| Cartão (2.0) | Ficha do cliente com título na borda; valores longos quebram por palavra, sem cortar UTF-8 | `ui_painel_*` |
+| Ajuda (2.0) | `?` no menu (as duas modalidades) e na listagem | `mostrar_ajuda`, `UI_MENU_AJUDA` |
+| Aviso de ação definitiva (2.0) | A remoção destaca que os dados serão apagados | `remover_cliente` |
+| Relatório HTML (2.0) | Página responsiva (cards no celular), tema claro/escuro, ícone SVG embutido, impressão limpa | `exportar.c` |
 
 ## 5. Arquitetura
 

@@ -10,17 +10,47 @@ Categorias usadas: **Adicionado**, **Alterado**, **Corrigido**, **Segurança**, 
 
 Mudanças prontas que ainda não viraram versão.
 
+## [2.0.0] - 2026-10-30
+
+Upgrade de desempenho, funcionalidades, qualidade e segurança. Auditoria completa em
+[`docs/AUDITORIA.md`](docs/AUDITORIA.md) e avaliação de tecnologias em
+[`docs/AVALIACAO_TECNOLOGIAS.md`](docs/AVALIACAO_TECNOLOGIAS.md).
+
 ### Adicionado
-- Ordenação da listagem: `/n` ordena por nome, `/c` por cidade (depois UF e nome) e `/o`
-  volta à ordem de cadastro. Só a exibição muda; o CSV e a coluna `#` continuam na ordem de cadastro.
-- `texto_para_comparacao`: forma minúscula e sem acentos de um texto UTF-8, usada no filtro
-  e na ordenação.
-- 8 cenários e 29 verificações automatizadas novas (36 cenários e 1273 verificações no total).
+- **Paginação da listagem:** 15 clientes por página; `/+` e `/-` navegam; filtro e ordem voltam à página 1.
+- **Ficha do cliente:** `#N` na listagem abre os dados completos do cliente nº N.
+- **Relatório HTML5/CSS3** (`/e`): exporta exatamente o que está na tela (filtro e ordem);
+  responsivo (cards no celular), tema claro/escuro automático, pronto para impressão,
+  sem JavaScript e sem recursos externos.
+- **Planilha CSV** (`/x`): compatível com Excel (BOM UTF-8, CRLF), CPF e CEP formatados como texto.
+- **Ajuda** (`?`) no menu e na listagem, com todos os atalhos.
+- **Ordenação da listagem:** `/n` por nome, `/c` por cidade (depois UF e nome), `/o` volta à
+  ordem de cadastro. Só a exibição muda; o CSV e a coluna `#` continuam na ordem de cadastro.
+- Componente de **cartão** (`ui_painel_*`) com quebra de linha por palavra, usado na ficha do cliente.
+- `make lint` (cppcheck), `make strict` (avisos extras com `-Werror`), `make bench` e `make check`.
+- `tests/benchmark.c`: mede gravação e carga de 1.000, 10.000 e 50.000 clientes.
+- `SECURITY.md` com política de relato, modelo de ameaça e riscos aceitos.
+- Workflow do GitHub Actions pronto em `docs/ci/ci.yml` (Linux com sanitizers e Windows).
+- `docs/AUDITORIA.md` e `docs/AVALIACAO_TECNOLOGIAS.md`; novas capturas de tela no README.
+- Testes: 1337 verificações (antes 1244) e 49 cenários ponta a ponta (antes 28).
 
 ### Alterado
+- **Desempenho:** a carga do CSV passou de quadrática para linear (índice de CPFs em tabela hash).
+  50.000 clientes: 3,096 s → 0,042 s; 10.000: 0,081 s → 0,009 s.
 - O filtro da listagem ignora acentos: "sao" encontra "São Paulo" e "SÃO" encontra "sao".
-- A listagem avisa quando o texto digitado é longo demais ou o comando de ordenação não existe,
-  em vez de ignorar a entrada em silêncio.
+- A listagem avisa quando o texto é longo demais ou o comando não existe, em vez de ignorar a entrada.
+- A ficha do cliente (confirmação de cadastro, alteração, remoção) é exibida em um cartão com borda.
+- A remoção mostra um aviso destacado de que a operação é definitiva.
+- README reescrito com instalação, configuração, uso, estrutura, testes e qualidade.
+
+### Corrigido
+- Achados da análise estática: escopo de variáveis, campo sem uso em `Icones`, verificação de
+  faixa de `converter_inteiro` documentada para plataformas em que `long` tem 64 bits.
+
+### Segurança
+- Relatório HTML com todo texto escapado (`& < > " '`), impedindo injeção de HTML a partir dos dados.
+- Planilha protegida contra injeção de fórmulas (`=`, `+`, `-`, `@`, tab, CR recebem apóstrofo).
+- CPF mascarado no relatório HTML (`***.982.247-**`) para proteger dados pessoais (LGPD).
 
 ## [1.2.0] - 2026-10-16
 
