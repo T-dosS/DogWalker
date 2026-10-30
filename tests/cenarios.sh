@@ -144,6 +144,15 @@ contem "Exibindo 1 de 3" "| 3   | Cláudia Conceição"; resultado "Filtro sem a
 entrada admin admin 3 /n "" 5; executar
 contem "Ordenado por nome"; resultado "Ordenação por nome" $?
 
+entrada admin admin 3 bruno /n "" 3 "" 5; executar
+ultima_tela() { awk 'BEGIN { RS = "LISTA DE CLIENTES" } { t = $0 } END { print t }' "$SAIDA"; }
+{ ultima_tela | grep -qF 'Filtro: "bruno"' && ultima_tela | grep -qF "Ordenado por nome"; }
+resultado "Listagem lembra filtro e ordem ao voltar" $?
+
+entrada admin admin 3 bruno /t "" 5; executar
+{ ultima_tela | grep -qF "Exibindo 3 de 3" && ! ultima_tela | grep -qF "Filtro:"; }
+resultado "Listagem: /t limpa o filtro" $?
+
 entrada admin admin 3 "#2" "" "" 5; executar
 contem "FICHA DO CLIENTE" "Cliente nº 2 de 3" "Bruno Lima" "111.444.777-35"; resultado "Ficha do cliente (#2)" $?
 
@@ -179,6 +188,13 @@ entrada admin admin 4 529.982.247-25 s "" 5; executar
   && ! grep -qF "52998224725" "$DADOS" \
   && [ "$(wc -l < "$DADOS")" -eq 3 ]; }
 resultado "Remoção apaga só o cliente escolhido" $?
+
+DESFAZER="$TMP/desfazer.csv"
+cp "$EXEMPLO" "$DESFAZER"
+entrada admin admin 4 529.982.247-25 s "" 4 s "" 3 "" 5; executar "$DESFAZER"
+{ contem "Desfazer a remoção de Ana Souza" "restaurado com sucesso" "Total: 3 cliente(s)" \
+  && grep -q "^52998224725;Ana Souza;" "$DESFAZER"; }
+resultado "Desfazer a última remoção" $?
 
 # --- Arquivo e ambiente ----------------------------------------------------
 : > "$DADOS"

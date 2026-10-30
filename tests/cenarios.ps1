@@ -109,6 +109,14 @@ Rodar 'Listagem: ordem mantém o filtro' @('admin','admin','3','a','/c','','5') 
 Rodar 'Listagem: comando desconhecido e texto longo' @('admin','admin','3','/z',('x'*300),'','5') @('Comando desconhecido. Digite ? para ver todos os comandos','Texto muito longo. O filtro anterior foi mantido','Exibindo 3 de 3') @('Filtro: "')
 Rodar 'Atalhos por letra (l = listar, s = sair)' @('admin','admin','l','','s') @('Total: 3 cliente(s)','Fim da execução')
 
+# --- Memória da sessão: filtro e ordem lembrados -------------------------
+Rodar 'Listagem lembra filtro e ordem ao voltar' @('admin','admin','3','bruno','/n','','3','','5') @('Filtro: "bruno"')
+$ultimaTela = ($script:ultimaSaida -split 'LISTA DE CLIENTES')[-1]
+Verificar 'Segunda abertura mostra o filtro e a ordem anteriores' ($ultimaTela -like '*Filtro: "bruno"*' -and $ultimaTela -like '*Ordenado por nome*' -and $ultimaTela -like '*Exibindo 1 de 3*')
+Rodar 'Listagem: /t limpa o filtro' @('admin','admin','3','bruno','/t','','5') @('Filtro: "bruno"')
+$ultimaTela = ($script:ultimaSaida -split 'LISTA DE CLIENTES')[-1]
+Verificar 'Depois do /t: todos os clientes e nenhum filtro' ($ultimaTela -like '*Exibindo 3 de 3*' -and $ultimaTela -notlike '*Filtro:*')
+
 # --- Ficha, ajuda e exportação -------------------------------------------
 Rodar 'Ficha do cliente pelo número (#2)' @('admin','admin','3','#2','','','5') @('FICHA DO CLIENTE','Cliente nº 2 de 3','Bruno Lima','111.444.777-35','voltar à lista')
 Rodar 'Ficha: número inválido' @('admin','admin','3','#99','#abc','#0','','5') @('Número de cliente inválido') @('FICHA DO CLIENTE')
@@ -129,6 +137,14 @@ $csv = if (Test-Path $planilha) { [IO.File]::ReadAllText($planilha, [Text.Encodi
 $posBruno = $csv.IndexOf('Bruno Lima;111.444.777-35;'); $posClaudia = $csv.IndexOf('Cláudia Conceição;'); $posJose = $csv.IndexOf("José D'Ávila & Cia.;")
 Verificar 'Planilha na ordem da tela (Bruno, Cláudia, José) e com CPF completo' ($posBruno -gt 0 -and $posClaudia -gt $posBruno -and $posJose -gt $posClaudia)
 Remove-Item $relatorio, $planilha -ErrorAction SilentlyContinue
+
+# --- Desfazer remoção (em uma cópia do arquivo de exemplo) -----------------
+$dadosDesfazer = Join-Path $env:TEMP 'dw_cenarios_desfazer.csv'
+Copy-Item (Join-Path $Projeto 'data\clientes_exemplo.csv') $dadosDesfazer -Force
+Rodar 'Desfazer a última remoção' @('admin','admin','4','529.982.247-25','s','','4','s','','3','','5') @('Mudou de ideia','Desfazer a remoção de Ana Souza','restaurado com sucesso','Total: 3 cliente(s)') @() $dadosDesfazer
+Verificar 'Cliente restaurado está no arquivo' ((Get-Content $dadosDesfazer -Encoding UTF8) -match '^52998224725;Ana Souza;').Count -eq 1
+Rodar 'Recusar o desfazer e remover outro cliente' @('admin','admin','4','529.982.247-25','s','','4','n','111.444.777-35','s','','3','','5') @('Desfazer a remoção de Ana Souza','Cliente removido com sucesso','Total: 1 cliente(s)') @('restaurado com sucesso') $dadosDesfazer
+Remove-Item $dadosDesfazer, "$dadosDesfazer.tmp" -ErrorAction SilentlyContinue
 
 # --- Paginação (20 clientes gerados) ---------------------------------------
 # Gera CPFs válidos com a mesma regra dos testes unitários.

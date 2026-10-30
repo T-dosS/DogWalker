@@ -47,8 +47,19 @@ static const UiItemMenu ITENS_MENU[TOTAL_OPCOES] = {
     {'5', 'S', "Encerrar", "Fecha o programa. Os dados já ficam salvos a cada operação."}
 };
 
+/**
+ * Estado da sessão de uso: vale enquanto o programa está aberto e é passado
+ * às operações por parâmetro, sem variáveis globais.
+ */
+typedef struct {
+    char filtro[TAM_ENTRADA]; /**< último filtro usado na listagem       */
+    OrdemListagem ordem;      /**< última ordem usada na listagem        */
+    Cliente removido;         /**< último cliente removido               */
+    int pode_desfazer;        /**< 1 se `removido` ainda pode ser restaurado */
+} Sessao;
+
 /** Assinatura comum das operações executadas sobre a lista de clientes. */
-typedef void (*Operacao)(ListaClientes *lista, const char *caminho);
+typedef void (*Operacao)(ListaClientes *lista, const char *caminho, Sessao *sessao);
 
 /* Mensagens de ajuda exibidas quando um campo é digitado incorretamente. */
 #define DICA_CPF   "CPF inválido. Digite 11 dígitos, com ou sem pontuação (ex.: 529.982.247-25)."
@@ -255,7 +266,8 @@ static int salvar_clientes(const char *caminho, const ListaClientes *lista)
  *
  * @return 1 se a operação foi executada, 0 se o arquivo não pôde ser lido.
  */
-static int executar_operacao(const char *titulo, Operacao operacao, const char *caminho)
+static int executar_operacao(const char *titulo, Operacao operacao, const char *caminho,
+                             Sessao *sessao)
 {
     ListaClientes lista;
     int carregou;
@@ -264,7 +276,7 @@ static int executar_operacao(const char *titulo, Operacao operacao, const char *
     lista_iniciar(&lista);
     carregou = carregar_clientes(caminho, &lista);
     if (carregou) {
-        operacao(&lista, caminho);
+        operacao(&lista, caminho, sessao);
     }
     lista_liberar(&lista);
     return carregou;
@@ -278,10 +290,11 @@ static int executar_operacao(const char *titulo, Operacao operacao, const char *
  * Cadastro: lê o CPF primeiro (para recusar duplicados logo no início),
  * depois os demais campos, mostra um resumo e pede confirmação.
  */
-static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
+static void cadastrar_cliente(ListaClientes *lista, const char *caminho, Sessao *sessao)
 {
     Cliente novo;
 
+    (void)sessao; /* o cadastro não usa o estado da sessão */
     memset(&novo, 0, sizeof novo);
     printf("\n");
     ui_info("Informe os dados do novo cliente.");
@@ -458,6 +471,8 @@ static void mostrar_ajuda(const char *voltar_para)
     printf("\n  %sListagem de clientes%s (digite e tecle Enter)\n", ui_codigo(UI_COR_TITULO), n);
     printf("    %stexto%s      filtra por nome, cidade, UF, e-mail ou CPF (sem acentos)\n", r, n);
     printf("    %s/n /c /o%s   ordena por nome, por cidade ou pela ordem de cadastro\n", r, n);
+    printf("    %s/t%s         limpa o filtro e mostra todos (filtro e ordem são lembrados)\n",
+           r, n);
     printf("    %s/+ /-%s      próxima página / página anterior (%u por página)\n", r, n,
            (unsigned)CLIENTES_POR_PAGINA);
     printf("    %s#3%s         abre a ficha completa do cliente nº 3\n", r, n);
@@ -469,6 +484,7 @@ static void mostrar_ajuda(const char *voltar_para)
 
     printf("\n  %sDicas%s\n", ui_codigo(UI_COR_TITULO), n);
     printf("    Na alteração, Enter mantém o valor atual de cada campo.\n");
+    printf("    Removeu por engano? Abra \"Remover cliente\" de novo para desfazer.\n");
     printf("    Ctrl+Z (Windows) ou Ctrl+D (Linux/macOS) encerra a qualquer momento.\n");
     printf("    NO_COLOR=1 ou DOGWALKER_SIMPLES=1 desligam cores e bordas.\n");
 
@@ -543,16 +559,16 @@ static int exportar_selecao(char tipo, const char *caminho_dados, const ListaCli
 /* A assinatura segue o tipo Operacao (lista não constante) para servir de
  * callback em executar_operacao, embora a listagem só leia a lista. */
 // cppcheck-suppress constParameterCallback
-static void listar_clientes(ListaClientes *lista, const char *caminho)
+static void listar_clientes(ListaClientes *lista, const char *caminho, Sessao *sessao)
 {
-    char filtro[TAM_ENTRADA] = "";
+    char filtro[TAM_ENTRADA];
     char entrada[TAM_ENTRADA];
     char rotulo[TAM_ENTRADA];
     /* Mensagens mostradas depois que a tela é redesenhada. */
     char sucesso[TAM_ENTRADA + FILENAME_MAX] = "";
     char falha[TAM_ENTRADA + FILENAME_MAX] = "";
     const char *aviso = NULL;
-    OrdemListagem ordem = ORDEM_CADASTRO;
+    OrdemListagem ordem = sessao->ordem; /* volta como o usuário deixou */
     const Cliente **visao = NULL;
     const Cliente **selecao = NULL;
     size_t selecionados = 0;
@@ -565,6 +581,14 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
         ui_info("Nenhum cliente cadastrado até o momento.");
         ui_pausar();
         return;
+    }
+
+    snprintf(filtro, sizeof filtro, "%s", sessao->filtro);
+    if (ordem != ORDEM_CADASTRO) {
+        visao = lista_criar_visao(lista, ordem);
+        if (visao == NULL) {
+            ordem = ORDEM_CADASTRO;
+        }
     }
 
     snprintf(rotulo, sizeof rotulo,
@@ -635,7 +659,7 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
             printf("  %sPágina %u de %u.%s", ui_codigo(UI_COR_TITULO), (unsigned)(pagina + 1),
                    (unsigned)paginas, ui_codigo(UI_COR_NORMAL));
         }
-        printf("\n  %s/n /c /o ordem   /+ /- página   #nº ficha   /e HTML   /x planilha%s\n",
+        printf("\n  %s/n /c /o ordem  /+ /- página  /t todos  #nº ficha  /e HTML  /x planilha%s\n",
                ui_codigo(UI_COR_SUAVE), ui_codigo(UI_COR_NORMAL));
 
         leitura = ler_linha(rotulo, entrada, sizeof entrada);
@@ -687,6 +711,9 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
             } else {
                 aviso = "Número de cliente inválido. Use o número da coluna #, ex.: #3.";
             }
+        } else if (strcmp(entrada, "/t") == 0 || strcmp(entrada, "/T") == 0) {
+            filtro[0] = '\0'; /* "todos": limpa o filtro */
+            refazer_selecao = 1;
         } else if (entrada[0] == '/') {
             aviso = "Comando desconhecido. Digite ? para ver todos os comandos.";
         } else {
@@ -694,6 +721,10 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
             refazer_selecao = 1;
         }
     }
+
+    /* Guarda filtro e ordem para a próxima vez que a listagem for aberta. */
+    snprintf(sessao->filtro, sizeof sessao->filtro, "%s", filtro);
+    sessao->ordem = ordem;
     free(selecao);
     free(visao);
 }
@@ -705,11 +736,12 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
  *
  * O CPF não é editável porque é a chave que identifica o cliente.
  */
-static void alterar_cliente(ListaClientes *lista, const char *caminho)
+static void alterar_cliente(ListaClientes *lista, const char *caminho, Sessao *sessao)
 {
     Cliente editado;
     int indice;
 
+    (void)sessao; /* a alteração não usa o estado da sessão */
     printf("\n");
     if (lista->quantidade == 0) {
         ui_info("Nenhum cliente cadastrado para alterar.");
@@ -756,14 +788,59 @@ static void alterar_cliente(ListaClientes *lista, const char *caminho)
 }
 
 /**
+ * Restaura o último cliente removido nesta sessão. Ele volta para o fim da
+ * lista. Se, nesse meio-tempo, alguém cadastrou o mesmo CPF, não restaura
+ * (CPF é único) e avisa.
+ */
+static void desfazer_remocao(ListaClientes *lista, const char *caminho, Sessao *sessao)
+{
+    char cpf[TAM_CPF_FORMATADO];
+
+    sessao->pode_desfazer = 0; /* tentativa única, dê certo ou não */
+    formatar_cpf(sessao->removido.cpf, cpf, sizeof cpf);
+    printf("\n");
+
+    if (lista_buscar_cpf(lista, sessao->removido.cpf) >= 0) {
+        ui_erro("Não é possível desfazer: o CPF %s foi cadastrado novamente.", cpf);
+        return;
+    }
+    if (!lista_adicionar(lista, &sessao->removido)) {
+        ui_erro("Memória insuficiente. A remoção não foi desfeita.");
+        return;
+    }
+    if (salvar_clientes(caminho, lista)) {
+        ui_sucesso("Cliente %s (CPF %s) restaurado com sucesso.", sessao->removido.nome, cpf);
+    }
+}
+
+/**
  * Remoção: localiza pelo CPF, mostra os dados, pede confirmação e remove
  * apenas aquele cliente. Os demais são preservados na mesma ordem.
+ *
+ * O cliente removido fica guardado na sessão: na próxima vez que esta tela
+ * for aberta (com o programa ainda aberto), é possível desfazer a remoção.
  */
-static void remover_cliente(ListaClientes *lista, const char *caminho)
+static void remover_cliente(ListaClientes *lista, const char *caminho, Sessao *sessao)
 {
     int indice;
 
     printf("\n");
+    if (sessao->pode_desfazer) {
+        char pergunta[TAM_ENTRADA];
+        snprintf(pergunta, sizeof pergunta, "  Desfazer a remoção de %s?", sessao->removido.nome);
+        ui_info("Última remoção nesta sessão: %s.", sessao->removido.nome);
+        switch (ui_confirmar(pergunta)) {
+        case 1:
+            desfazer_remocao(lista, caminho, sessao);
+            return;
+        case -1:
+            return; /* fim da entrada */
+        default:
+            printf("\n");
+            break; /* segue para remover outro cliente */
+        }
+    }
+
     if (lista->quantidade == 0) {
         ui_info("Nenhum cliente cadastrado para remover.");
         return;
@@ -784,14 +861,22 @@ static void remover_cliente(ListaClientes *lista, const char *caminho)
         return;
     }
 
-    if (!lista_remover(lista, (size_t)indice)) {
-        printf("\n");
-        ui_erro("Erro interno ao remover o cliente.");
-        return;
-    }
-    if (salvar_clientes(caminho, lista)) {
-        printf("\n");
-        ui_sucesso("Cliente removido com sucesso!");
+    {
+        /* Cópia feita ANTES de remover: lista_remover sobrescreve a posição. */
+        Cliente removido = lista->itens[indice];
+
+        if (!lista_remover(lista, (size_t)indice)) {
+            printf("\n");
+            ui_erro("Erro interno ao remover o cliente.");
+            return;
+        }
+        if (salvar_clientes(caminho, lista)) {
+            sessao->removido = removido;
+            sessao->pode_desfazer = 1;
+            printf("\n");
+            ui_sucesso("Cliente removido com sucesso!");
+            ui_info("Mudou de ideia? Abra \"Remover cliente\" de novo para desfazer.");
+        }
     }
 }
 
@@ -838,6 +923,10 @@ static void montar_status(char *status, size_t tamanho, const char *usuario,
 void menu_executar(const char *caminho_arquivo, const char *usuario)
 {
     int selecionado = 0;
+    Sessao sessao;
+
+    memset(&sessao, 0, sizeof sessao); /* filtro vazio, ordem de cadastro */
+    sessao.ordem = ORDEM_CADASTRO;
 
     /* Laço em vez de recursão: o original chamava mainMenu() de dentro de
      * cada tela, empilhando chamadas sem nunca retornar (risco de estouro
@@ -865,16 +954,20 @@ void menu_executar(const char *caminho_arquivo, const char *usuario)
 
         switch (escolha) {
         case OPCAO_CADASTRAR:
-            executou = executar_operacao("CADASTRO DE CLIENTE", cadastrar_cliente, caminho_arquivo);
+            executou = executar_operacao("CADASTRO DE CLIENTE", cadastrar_cliente,
+                                         caminho_arquivo, &sessao);
             break;
         case OPCAO_ALTERAR:
-            executou = executar_operacao("ALTERAÇÃO DE CLIENTE", alterar_cliente, caminho_arquivo);
+            executou = executar_operacao("ALTERAÇÃO DE CLIENTE", alterar_cliente,
+                                         caminho_arquivo, &sessao);
             break;
         case OPCAO_LISTAR:
-            executou = executar_operacao("LISTA DE CLIENTES", listar_clientes, caminho_arquivo);
+            executou = executar_operacao("LISTA DE CLIENTES", listar_clientes,
+                                         caminho_arquivo, &sessao);
             break;
         case OPCAO_REMOVER:
-            executou = executar_operacao("REMOÇÃO DE CLIENTE", remover_cliente, caminho_arquivo);
+            executou = executar_operacao("REMOÇÃO DE CLIENTE", remover_cliente,
+                                         caminho_arquivo, &sessao);
             break;
         default:
             break;
