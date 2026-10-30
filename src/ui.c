@@ -69,11 +69,11 @@ static const Bordas BORDAS_SIMPLES = {
 
 /** Ícones das mensagens e do menu. */
 typedef struct {
-    const char *sucesso, *erro, *aviso, *info, *seletor, *reticencias, *separador;
+    const char *sucesso, *erro, *aviso, *info, *seletor, *reticencias;
 } Icones;
 
-static const Icones ICONES_RICOS = { "✔", "✖", "⚠", "●", "❯", "…", " • " };
-static const Icones ICONES_SIMPLES = { "[OK]", "[ERRO]", "[AVISO]", "[i]", ">", "...", " | " };
+static const Icones ICONES_RICOS = { "✔", "✖", "⚠", "●", "❯", "…" };
+static const Icones ICONES_SIMPLES = { "[OK]", "[ERRO]", "[AVISO]", "[i]", ">", "..." };
 
 static const Bordas *bordas(void)
 {
@@ -301,6 +301,87 @@ void ui_info(const char *formato, ...)
 }
 
 /* ------------------------------------------------------------------ */
+/* Painel (ficha)                                                      */
+/* ------------------------------------------------------------------ */
+
+#define PAINEL_ROTULO 12 /* colunas reservadas ao rótulo, ex.: "Endereço" */
+/* Colunas para o valor: largura total menos bordas, espaços e rótulo. */
+#define PAINEL_VALOR (UI_LARGURA - 4 - PAINEL_ROTULO)
+
+void ui_painel_inicio(const char *titulo)
+{
+    const Bordas *b = bordas();
+    size_t ocupado = ui_largura_texto(titulo) + 3; /* "─ " + título + " " */
+
+    printf("  %s%s %s%s%s ", b->sup_esq, b->horizontal, ui_codigo(UI_COR_TITULO), titulo,
+           ui_codigo(UI_COR_NORMAL));
+    repetir(b->horizontal, ocupado < UI_LARGURA - 2 ? UI_LARGURA - 2 - ocupado : 0);
+    printf("%s\n", b->sup_dir);
+}
+
+/** Uma linha do painel: │ <rótulo alinhado> <trecho do valor> <espaços> │ */
+static void linha_de_painel(const char *rotulo, const char *trecho, size_t bytes)
+{
+    size_t colunas = 0;
+    size_t i;
+
+    for (i = 0; i < bytes; i++) {
+        if (!byte_de_continuacao(trecho[i])) {
+            colunas++;
+        }
+    }
+    printf("  %s %s", bordas()->vertical, ui_codigo(UI_COR_ROTULO));
+    escrever_alinhado(rotulo, PAINEL_ROTULO);
+    printf("%s%.*s", ui_codigo(UI_COR_NORMAL), (int)bytes, trecho);
+    repetir(" ", colunas < PAINEL_VALOR ? PAINEL_VALOR - colunas : 0);
+    printf(" %s\n", bordas()->vertical);
+}
+
+void ui_painel_campo(const char *rotulo, const char *valor)
+{
+    const char *p = valor;
+    int primeira = 1;
+
+    /* Quebra o valor em pedaços de até PAINEL_VALOR colunas. Prefere quebrar
+     * depois de um espaço; uma palavra maior que a linha é quebrada no meio
+     * (sempre entre caracteres UTF-8 inteiros). */
+    do {
+        size_t bytes = 0;
+        size_t colunas = 0;
+        size_t apos_espaco = 0;
+
+        while (p[bytes] != '\0' && colunas < PAINEL_VALOR) {
+            if (p[bytes] == ' ') {
+                apos_espaco = bytes + 1;
+            }
+            bytes++;
+            while (byte_de_continuacao(p[bytes])) {
+                bytes++;
+            }
+            colunas++;
+        }
+        if (p[bytes] != '\0' && p[bytes] != ' ' && apos_espaco > 0) {
+            bytes = apos_espaco;
+        }
+
+        linha_de_painel(primeira ? rotulo : "", p, bytes);
+        p += bytes;
+        while (*p == ' ') {
+            p++;
+        }
+        primeira = 0;
+    } while (*p != '\0');
+}
+
+void ui_painel_fim(void)
+{
+    const Bordas *b = bordas();
+    printf("  %s", b->inf_esq);
+    repetir(b->horizontal, UI_LARGURA - 2);
+    printf("%s\n", b->inf_dir);
+}
+
+/* ------------------------------------------------------------------ */
 /* Tabelas                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -406,7 +487,7 @@ static void desenhar_menu(const char *titulo, const char *status,
            itens[atual].descricao, ui_codigo(UI_COR_NORMAL));
     printf("\n  %s", ui_codigo(UI_COR_SUAVE));
     repetir(bordas()->horizontal, UI_LARGURA - 2);
-    printf("\n  ↑↓ navegar   Enter selecionar   1-%d ou letra: atalho   Esc sair%s\n",
+    printf("\n  ↑↓ navegar   Enter selecionar   1-%d ou letra: atalho   ? ajuda   Esc sair%s\n",
            quantidade, ui_codigo(UI_COR_NORMAL));
 }
 
@@ -444,6 +525,11 @@ static int menu_interativo(const char *titulo, const char *status,
             decidido = 1;
             break;
         case TECLA_NAV_CARACTERE:
+            if (caractere == '?') {
+                escolha = UI_MENU_AJUDA;
+                decidido = 1;
+                break;
+            }
             indice = item_por_tecla(itens, quantidade, caractere);
             if (indice >= 0) {
                 atual = indice;
@@ -475,6 +561,7 @@ static int menu_por_linha(const char *titulo, const char *status,
         escrever_alinhado(itens[i].texto, 30);
         printf(" (%c)\n", itens[i].letra);
     }
+    printf("  [?] Ajuda\n");
 
     for (;;) {
         ResultadoEntrada leitura =
@@ -482,6 +569,9 @@ static int menu_por_linha(const char *titulo, const char *status,
 
         if (leitura == ENTRADA_FIM) {
             return UI_MENU_FIM;
+        }
+        if (leitura == ENTRADA_OK && strcmp(entrada, "?") == 0) {
+            return UI_MENU_AJUDA;
         }
         if (leitura == ENTRADA_OK && strlen(entrada) == 1) {
             int indice = item_por_tecla(itens, quantidade, entrada[0]);
@@ -544,7 +634,7 @@ int ui_confirmar(const char *pergunta)
     }
 }
 
-void ui_pausar(void)
+void ui_aguardar_enter(const char *aviso)
 {
     char rotulo[TAM_ENTRADA];
     char descarte[TAM_ENTRADA];
@@ -552,7 +642,12 @@ void ui_pausar(void)
     if (entrada_encerrada()) {
         return;
     }
-    snprintf(rotulo, sizeof rotulo, "\n  %sPressione ENTER para voltar ao menu...%s",
-             ui_codigo(UI_COR_SUAVE), ui_codigo(UI_COR_NORMAL));
+    snprintf(rotulo, sizeof rotulo, "\n  %s%s%s", ui_codigo(UI_COR_SUAVE), aviso,
+             ui_codigo(UI_COR_NORMAL));
     (void)ler_linha(rotulo, descarte, sizeof descarte);
+}
+
+void ui_pausar(void)
+{
+    ui_aguardar_enter("Pressione ENTER para voltar ao menu...");
 }

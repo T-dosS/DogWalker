@@ -11,7 +11,7 @@ proposta do projeto (um portfólio de **linguagem C**) e sem adicionar complexid
 | Arquitetura | `menu.c` misturava navegação e telas; o único recurso visual era um título entre linhas `=====` |
 | Entrada | Tudo por linha (`fgets`). A leitura tecla a tecla já existia só para a senha (`*`) |
 | Ambiente | Windows 11 e terminais modernos (Windows Terminal, VS Code, Linux, macOS) entendem sequências ANSI e Unicode |
-| Restrição | 28 cenários e os testes automatizados rodam com entrada/saída **redirecionadas** (sem terminal real) |
+| Restrição | 36 cenários e os testes automatizados rodam com entrada/saída **redirecionadas** (sem terminal real) |
 
 ## 2. Alternativas
 
@@ -50,6 +50,11 @@ proposta do projeto (um portfólio de **linguagem C**) e sem adicionar complexid
 | Formulários | Rótulos coloridos e valor atual entre colchetes na alteração | `ler_campo` |
 | Limpeza de tela | `ESC[H ESC[2J` no lugar do `system("cls")` original | `ui_limpar_tela` |
 | Restauração | Cor e cursor são restaurados ao sair (`atexit`) | `restaurar_terminal` |
+| Paginação (2.0) | 15 clientes por página, `/+` `/-`, indicador "Página X de Y" | `listar_clientes` |
+| Cartão (2.0) | Ficha do cliente com título na borda; valores longos quebram por palavra, sem cortar UTF-8 | `ui_painel_*` |
+| Ajuda (2.0) | `?` no menu (as duas modalidades) e na listagem | `mostrar_ajuda`, `UI_MENU_AJUDA` |
+| Aviso de ação definitiva (2.0) | A remoção destaca que os dados serão apagados | `remover_cliente` |
+| Relatório HTML (2.0) | Página responsiva (cards no celular), tema claro/escuro, ícone SVG embutido, impressão limpa | `exportar.c` |
 
 ## 5. Arquitetura
 
@@ -75,8 +80,8 @@ do Windows, "negrito + preto" vira cinza e perde contraste (detectado nas captur
 ## 7. Como foi validado
 
 * Compilação sem warnings com `-Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion -Wsign-conversion -fanalyzer`.
-* 1244 verificações automatizadas, incluindo filtro e truncamento UTF-8.
-* 28 cenários de uso com entrada redirecionada, no modo simples.
+* 1273 verificações automatizadas, incluindo filtro sem acentos, ordenação e truncamento UTF-8.
+* 36 cenários de uso com entrada redirecionada, no modo simples.
 * Console real do Windows: teclas simuladas (setas, Esc, atalhos) e telas capturadas **com cores**.
   As imagens em `docs/img/` são dessas capturas.
 * O código específico do Linux/macOS (sequência `ESC [ A/B`) segue o padrão POSIX `termios`, mas

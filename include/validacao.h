@@ -73,6 +73,17 @@ int converter_inteiro(const char *texto, int *valor);
 /** Remove espaços (e '\r', '\t', '\n') do início e do fim do texto. */
 void aparar_texto(char *texto);
 
+/**
+ * Gera a forma de comparação de um texto UTF-8: minúsculas e sem acentos
+ * ("São João" vira "sao joao"). Usada pelo filtro e pela ordenação da
+ * listagem, para que "sao" encontre "São" e "Álvaro" fique entre os "A".
+ *
+ * Cobre as letras acentuadas do Latin-1 (À–ÿ, que incluem todas as do
+ * português); outros caracteres são copiados sem mudança. O resultado
+ * nunca é maior que a entrada e é truncado se não couber em `tamanho`.
+ */
+void texto_para_comparacao(const char *entrada, char *saida, size_t tamanho);
+
 /** Formata 11 dígitos como 000.000.000-00. */
 void formatar_cpf(const char *cpf, char *saida, size_t tamanho);
 
