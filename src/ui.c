@@ -69,11 +69,11 @@ static const Bordas BORDAS_SIMPLES = {
 
 /** Ícones das mensagens e do menu. */
 typedef struct {
-    const char *sucesso, *erro, *aviso, *info, *seletor, *reticencias, *separador;
+    const char *sucesso, *erro, *aviso, *info, *seletor, *reticencias;
 } Icones;
 
-static const Icones ICONES_RICOS = { "✔", "✖", "⚠", "●", "❯", "…", " • " };
-static const Icones ICONES_SIMPLES = { "[OK]", "[ERRO]", "[AVISO]", "[i]", ">", "...", " | " };
+static const Icones ICONES_RICOS = { "✔", "✖", "⚠", "●", "❯", "…" };
+static const Icones ICONES_SIMPLES = { "[OK]", "[ERRO]", "[AVISO]", "[i]", ">", "..." };
 
 static const Bordas *bordas(void)
 {

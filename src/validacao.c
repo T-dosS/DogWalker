@@ -280,8 +280,13 @@ int converter_inteiro(const char *texto, int *valor)
 
     /* fim == texto: nada foi convertido ("abc" ou "").
      * *fim != '\0': sobrou texto depois do número ("3abc"). */
-    if (fim == texto || *fim != '\0' || errno == ERANGE
-        || numero < INT_MIN || numero > INT_MAX) {
+    if (fim == texto || *fim != '\0' || errno == ERANGE) {
+        return 0;
+    }
+    /* A faixa de int só é testada de fato onde long tem 64 bits (Linux,
+     * macOS); no Windows long e int têm o mesmo tamanho e o ERANGE basta. */
+    // cppcheck-suppress compareValueOutOfTypeRangeError
+    if (numero < INT_MIN || numero > INT_MAX) {
         return 0;
     }
     *valor = (int)numero;

@@ -182,7 +182,6 @@ static int ler_cpf(char *cpf, size_t tamanho)
 static int localizar_cliente(const ListaClientes *lista)
 {
     char cpf[TAM_CPF];
-    char cpf_formatado[TAM_CPF_FORMATADO];
     int indice;
     int leitura = ler_cpf(cpf, sizeof cpf);
 
@@ -196,6 +195,7 @@ static int localizar_cliente(const ListaClientes *lista)
 
     indice = lista_buscar_cpf(lista, cpf);
     if (indice < 0) {
+        char cpf_formatado[TAM_CPF_FORMATADO];
         formatar_cpf(cpf, cpf_formatado, sizeof cpf_formatado);
         printf("\n");
         ui_erro("Nenhum cliente encontrado com o CPF %s.", cpf_formatado);
@@ -276,7 +276,6 @@ static int executar_operacao(const char *titulo, Operacao operacao, const char *
 static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
 {
     Cliente novo;
-    int leitura;
 
     memset(&novo, 0, sizeof novo);
     printf("\n");
@@ -284,7 +283,7 @@ static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
     printf("\n");
 
     for (;;) {
-        leitura = ler_cpf(novo.cpf, sizeof novo.cpf);
+        int leitura = ler_cpf(novo.cpf, sizeof novo.cpf);
         if (leitura == 0) {
             printf("\n");
             ui_aviso("Cadastro cancelado.");
@@ -415,6 +414,9 @@ static const char *descrever_ordem(OrdemListagem ordem)
  * faz o papel da pausa: ENTER vazio volta ao menu; um termo refaz a tabela
  * filtrada; "/n", "/c" e "/o" mudam a ordem e mantêm o filtro atual.
  */
+/* A assinatura segue o tipo Operacao (lista não constante) para servir de
+ * callback em executar_operacao, embora a listagem só leia a lista. */
+// cppcheck-suppress constParameterCallback
 static void listar_clientes(ListaClientes *lista, const char *caminho)
 {
     char filtro[TAM_ENTRADA] = "";
