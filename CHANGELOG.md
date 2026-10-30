@@ -24,6 +24,9 @@ Upgrade de desempenho, funcionalidades, qualidade e segurança. Auditoria comple
   sem JavaScript e sem recursos externos.
 - **Planilha CSV** (`/x`): compatível com Excel (BOM UTF-8, CRLF), CPF e CEP formatados como texto.
 - **Ajuda** (`?`) no menu e na listagem, com todos os atalhos.
+- **Desfazer a última remoção:** enquanto o programa está aberto, abrir "Remover cliente" de novo
+  oferece restaurar o cliente removido (se o CPF não tiver sido cadastrado outra vez).
+- **Listagem lembra filtro e ordem** durante a sessão; `/t` limpa o filtro.
 - **Ordenação da listagem:** `/n` por nome, `/c` por cidade (depois UF e nome), `/o` volta à
   ordem de cadastro. Só a exibição muda; o CSV e a coluna `#` continuam na ordem de cadastro.
 - Componente de **cartão** (`ui_painel_*`) com quebra de linha por palavra, usado na ficha do cliente.
@@ -32,8 +35,8 @@ Upgrade de desempenho, funcionalidades, qualidade e segurança. Auditoria comple
 - `SECURITY.md` com política de relato, modelo de ameaça e riscos aceitos.
 - Workflow do GitHub Actions pronto em `docs/ci/ci.yml` (Linux com sanitizers e Windows).
 - `docs/AUDITORIA.md` e `docs/AVALIACAO_TECNOLOGIAS.md`; novas capturas de tela no README.
-- Testes: 1337 verificações (antes 1244) e 49 cenários ponta a ponta (antes 28).
-- `tests/cenarios.sh`: 24 cenários ponta a ponta em shell POSIX, para Linux, macOS, Git Bash e a CI
+- Testes: 1337 verificações (antes 1244) e 56 cenários ponta a ponta (antes 28).
+- `tests/cenarios.sh`: 27 cenários ponta a ponta em shell POSIX, para Linux, macOS, Git Bash e a CI
   (`make cenarios` fora do Windows).
 
 ### Alterado

@@ -3,7 +3,7 @@
 ![Linguagem](https://img.shields.io/badge/linguagem-C11-blue)
 ![Plataformas](https://img.shields.io/badge/plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 ![Dependências](https://img.shields.io/badge/depend%C3%AAncias-nenhuma-brightgreen)
-![Testes](https://img.shields.io/badge/testes-1337%20verifica%C3%A7%C3%B5es%20%2B%2049%20cen%C3%A1rios-brightgreen)
+![Testes](https://img.shields.io/badge/testes-1337%20verifica%C3%A7%C3%B5es%20%2B%2056%20cen%C3%A1rios-brightgreen)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
 Sistema de linha de comando para cadastrar, consultar, alterar, remover e exportar os clientes
@@ -49,7 +49,7 @@ com a análise de cada problema em [`docs/ANALISE_CODIGO_ORIGINAL.md`](docs/ANAL
 | 📋 **Listagem** | Tabela com bordas, **15 por página**, filtro por nome, cidade, UF, e-mail ou CPF (acentos opcionais) e ordenação por nome ou cidade |
 | 🪪 **Ficha** | `#3` na listagem abre a ficha completa do cliente nº 3, em um cartão |
 | ✏️ **Alteração** | Busca por CPF; ENTER mantém o valor atual de cada campo |
-| 🗑️ **Remoção** | Busca por CPF, mostra a ficha, avisa que é definitiva e pede confirmação |
+| 🗑️ **Remoção** | Busca por CPF, mostra a ficha, avisa que é definitiva e pede confirmação; a última remoção pode ser **desfeita** enquanto o programa estiver aberto |
 | 📄 **Relatório HTML** | `/e` exporta o que está na tela (filtro + ordem): página responsiva, tema claro/escuro, pronta para imprimir, CPF mascarado |
 | 📊 **Planilha** | `/x` exporta para CSV compatível com Excel, protegido contra injeção de fórmulas |
 | ❓ **Ajuda** | `?` no menu ou na listagem mostra todos os atalhos |
@@ -160,7 +160,8 @@ Para começar com dados fictícios: `cp data/clientes_exemplo.csv data/clientes.
 | Menu | `1`–`5` ou `C` `A` `L` `R` `S` | Abre a opção direto |
 | Menu | `?` / `Esc` | Ajuda / encerra |
 | Listagem | texto + `Enter` | Filtra (nome, cidade, UF, e-mail, CPF; "sao" encontra "São") |
-| Listagem | `/n` `/c` `/o` | Ordena por nome, por cidade ou pela ordem de cadastro |
+| Listagem | `/n` `/c` `/o` | Ordena por nome, por cidade ou pela ordem de cadastro (filtro e ordem são lembrados) |
+| Listagem | `/t` | Limpa o filtro e mostra todos |
 | Listagem | `/+` `/-` | Próxima página / página anterior |
 | Listagem | `#3` | Ficha completa do cliente nº 3 |
 | Listagem | `/e` / `/x` | Exporta o que está na tela para HTML / planilha |
@@ -193,8 +194,8 @@ DogWalker/
 │   └── login.c              # autenticação com 3 tentativas
 ├── tests/
 │   ├── test_dogwalker.c     # 1337 verificações unitárias (make test)
-│   ├── cenarios.ps1         # 49 cenários ponta a ponta no Windows (make cenarios)
-│   ├── cenarios.sh          # 24 cenários ponta a ponta em shell POSIX (Linux, macOS, Git Bash)
+│   ├── cenarios.ps1         # 56 cenários ponta a ponta no Windows (make cenarios)
+│   ├── cenarios.sh          # 27 cenários ponta a ponta em shell POSIX (Linux, macOS, Git Bash)
 │   └── benchmark.c          # medição de desempenho (make bench)
 ├── data/clientes_exemplo.csv # dados FICTÍCIOS
 ├── docs/
@@ -217,7 +218,7 @@ DogWalker/
 | Comando | O que valida | Resultado atual |
 |---------|--------------|-----------------|
 | `make test` | Regras de negócio, persistência, filtro, ordenação, exportação (escape HTML, fórmulas, máscara), UTF-8 | **1337 verificações, 0 falhas** |
-| `make cenarios` | Usos completos com o programa real: login, cadastro com erros, filtro, ordenação, paginação, ficha, ajuda, exportações (conferindo o conteúdo dos arquivos), alteração e remoção (conferindo que só o cliente escolhido mudou), arquivo vazio/corrompido, pasta inexistente | **Windows:** 49 cenários (PowerShell), 0 falhas · **Linux/macOS:** 24 cenários (`sh`), 0 falhas no Git Bash |
+| `make cenarios` | Usos completos com o programa real: login, cadastro com erros, filtro, ordenação, paginação, ficha, ajuda, exportações (conferindo o conteúdo dos arquivos), alteração e remoção (conferindo que só o cliente escolhido mudou), arquivo vazio/corrompido, pasta inexistente | **Windows:** 56 cenários (PowerShell), 0 falhas · **Linux/macOS:** 27 cenários (`sh`), 0 falhas no Git Bash |
 | `make bench` | Tempo de gravar e carregar 1.000, 10.000 e 50.000 clientes | 50.000 carregados em ~0,04 s |
 | `make check` | Tudo antes de publicar: build rigoroso com `-Werror`, testes, cppcheck e cenários | ✅ |
 

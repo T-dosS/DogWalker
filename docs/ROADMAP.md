@@ -14,20 +14,20 @@ Legenda: 🟢 pode ser feito · 🟡 aguardando decisão do mantenedor · 🔴 b
 | 3 | Telefone/WhatsApp do tutor | Funcionalidade | 🟡 | Muda o formato do CSV; precisa de migração dos dados existentes (coluna nova com valor vazio) |
 | 4 | Senha com *hash* e arquivo de usuários | Segurança | 🟡 | Decidir se haverá cadastro de usuários e perfis; sem dependência externa seria SHA-256 + sal implementado em C |
 | 5 | Agenda de passeios (data, horário, passeador, cão) | Funcionalidade | 🟡 | Depende do item 2 |
-| 6 | Lembrar a última ordem e o filtro da listagem durante a sessão | Melhoria | 🟢 | Hoje a listagem volta à ordem de cadastro a cada abertura |
-| 8 | Desfazer a última remoção | Melhoria | 🟢 | Ex.: manter o último cliente removido em memória até sair do programa |
+| 6 | Completar `tests/cenarios.sh` com todos os cenários da versão PowerShell | Qualidade | 🟢 | Hoje cobre os fluxos principais (27 de 56) |
 
 ## Concluídos na 2.0
 
 Paginação, ficha do cliente, relatório HTML, planilha protegida contra fórmulas (resolveu o item
 "Proteção contra fórmulas" com a opção de arquivo separado, sem mudar o que o cadastro aceita),
-ajuda, carga linear do CSV, análise estática e política de segurança. Detalhes no CHANGELOG.
+ajuda, carga linear do CSV, análise estática, política de segurança, cenários em shell POSIX,
+memória de filtro/ordem na sessão e desfazer a última remoção. Detalhes no CHANGELOG.
 
 ## Limitações conhecidas
 
 - O caminho de teclado do Linux/macOS (`termios`, sequência `ESC [ A/B`) ainda não foi executado:
   não há ambiente Linux sem a CI (item 1).
-- `tests/cenarios.sh` (24 cenários) cobre os fluxos principais, mas ainda não todos os 49 da versão
+- `tests/cenarios.sh` (27 cenários) cobre os fluxos principais, mas ainda não todos os 56 da versão
   PowerShell (ex.: ordenação por cidade em detalhe, ajuda na listagem, texto longo).
 - Busca por CPF nas telas de alteração/remoção é linear (O(n)); com a carga linear, isso é
   imperceptível até dezenas de milhares de clientes.

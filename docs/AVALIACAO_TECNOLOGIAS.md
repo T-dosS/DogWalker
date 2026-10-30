@@ -9,7 +9,7 @@ tecnologia só para aumentar a lista não conta.
 
 - O DogWalker é um **gerenciador local**, usado por uma pessoa por vez num pequeno negócio de passeios.
 - É um **projeto de portfólio em C**. Demonstrar C bem feito é parte do objetivo.
-- O núcleo está **estável e testado** (1.337 verificações, 49 cenários) e não tem dependências.
+- O núcleo está **estável e testado** (1.337 verificações, 56 cenários) e não tem dependências.
 - Volume esperado: centenas a poucos milhares de clientes. Com a carga linear da 2.0,
   50 mil clientes carregam em 0,04 s.
 
