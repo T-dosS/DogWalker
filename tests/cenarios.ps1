@@ -103,11 +103,50 @@ Verificar 'Ordem por cidade: Belo Horizonte, Campinas, Rio de Janeiro' (EmOrdem 
 Rodar 'Listagem ordenada por nome e de volta ao cadastro' @('admin','admin','3','/n','/o','','5') @('Ordenado por nome','Exibindo 3 de 3')
 Verificar 'Ordem por nome: Bruno, Cláudia, José' (EmOrdem 'Ordenado por nome' @('| 2   | Bruno','| 3   | Cláudia','| 1   | José'))
 # Três telas: cadastro, nome e (depois do /o) cadastro de novo, sem o aviso de ordem.
-$telas = $script:ultimaSaida -split 'Ordenar: /n'
+$telas = $script:ultimaSaida -split '/n /c /o ordem'
 Verificar 'Ordem de cadastro restaurada com /o' ($telas.Count -eq 4 -and $telas[1] -like '*Ordenado por nome*' -and $telas[2] -notlike '*Ordenado por*' -and $telas[2] -like '*Exibindo 3 de 3*' -and $telas[2].IndexOf('| 1   | José') -ge 0 -and $telas[2].IndexOf('| 1   | José') -lt $telas[2].IndexOf('| 2   | Bruno'))
 Rodar 'Listagem: ordem mantém o filtro' @('admin','admin','3','a','/c','','5') @('Filtro: "a"','Ordenado por cidade')
-Rodar 'Listagem: comando desconhecido e texto longo' @('admin','admin','3','/x',('x'*300),'','5') @('Comando desconhecido. Use /n, /c ou /o','Texto muito longo. O filtro anterior foi mantido','Exibindo 3 de 3') @('Filtro: "')
+Rodar 'Listagem: comando desconhecido e texto longo' @('admin','admin','3','/z',('x'*300),'','5') @('Comando desconhecido. Digite ? para ver todos os comandos','Texto muito longo. O filtro anterior foi mantido','Exibindo 3 de 3') @('Filtro: "')
 Rodar 'Atalhos por letra (l = listar, s = sair)' @('admin','admin','l','','s') @('Total: 3 cliente(s)','Fim da execução')
+
+# --- Ficha, ajuda e exportação -------------------------------------------
+Rodar 'Ficha do cliente pelo número (#2)' @('admin','admin','3','#2','','','5') @('FICHA DO CLIENTE','Cliente nº 2 de 3','Bruno Lima','111.444.777-35','voltar à lista')
+Rodar 'Ficha: número inválido' @('admin','admin','3','#99','#abc','#0','','5') @('Número de cliente inválido') @('FICHA DO CLIENTE')
+Rodar 'Ajuda pelo menu (?)' @('admin','admin','?','','5') @('AJUDA','/+ /-','#3','/e','/x','Pressione ENTER para voltar ao menu','Fim da execução')
+Rodar 'Ajuda pela listagem (?)' @('admin','admin','3','?','','','5') @('AJUDA','Pressione ENTER para voltar à lista','Exibindo 3 de 3')
+
+$relatorio = Join-Path $env:TEMP 'relatorio.html'
+$planilha = Join-Path $env:TEMP 'exportacao.csv'
+Remove-Item $relatorio, $planilha -ErrorAction SilentlyContinue
+Rodar 'Exportar relatório HTML com filtro (/e)' @('admin','admin','3','bruno','/e','','5') @('Relatório gerado com 1 cliente(s)','relatorio.html')
+$html = if (Test-Path $relatorio) { [IO.File]::ReadAllText($relatorio, [Text.Encoding]::UTF8) } else { '' }
+Verificar 'Relatório tem só o recorte filtrado, com CPF mascarado' ($html -like '*Bruno Lima*' -and $html -notlike '*Cláudia*' -and $html -like '*`*`*`*.444.777-`*`**' -and $html -notlike '*111.444.777-35*' -and $html -like '*Clientes com &quot;bruno&quot;*')
+Rodar 'Exportar relatório HTML completo (/e)' @('admin','admin','3','/e','','5') @('Relatório gerado com 3 cliente(s)')
+$html = if (Test-Path $relatorio) { [IO.File]::ReadAllText($relatorio, [Text.Encoding]::UTF8) } else { '' }
+Verificar 'Relatório escapa caracteres especiais do nome' ($html -like '*José D&#39;Ávila &amp; Cia.*' -and $html -notlike "*José D'Ávila & Cia.*")
+Rodar 'Exportar planilha ordenada por nome (/n e /x)' @('admin','admin','3','/n','/x','','5') @('Planilha gerada com 3 cliente(s)','exportacao.csv')
+$csv = if (Test-Path $planilha) { [IO.File]::ReadAllText($planilha, [Text.Encoding]::UTF8) } else { '' }
+$posBruno = $csv.IndexOf('Bruno Lima;111.444.777-35;'); $posClaudia = $csv.IndexOf('Cláudia Conceição;'); $posJose = $csv.IndexOf("José D'Ávila & Cia.;")
+Verificar 'Planilha na ordem da tela (Bruno, Cláudia, José) e com CPF completo' ($posBruno -gt 0 -and $posClaudia -gt $posBruno -and $posJose -gt $posClaudia)
+Remove-Item $relatorio, $planilha -ErrorAction SilentlyContinue
+
+# --- Paginação (20 clientes gerados) ---------------------------------------
+# Gera CPFs válidos com a mesma regra dos testes unitários.
+function Gerar-Cpf([int]$semente) {
+    $base = '{0:D9}' -f (100000000 + $semente * 7919)
+    $d = @($base.ToCharArray() | ForEach-Object { [int][string]$_ })
+    $s = 0; for ($i = 0; $i -lt 9; $i++) { $s += $d[$i] * (10 - $i) }; $d += ($s * 10) % 11 % 10
+    $s = 0; for ($i = 0; $i -lt 10; $i++) { $s += $d[$i] * (11 - $i) }; $d += ($s * 10) % 11 % 10
+    return ($d -join '')
+}
+$dadosPaginas = Join-Path $env:TEMP 'dw_cenarios_paginas.csv'
+$linhasCsv = @('cpf;nome;email;rua;numero;bairro;cidade;estado;cep')
+for ($n = 1; $n -le 20; $n++) { $linhasCsv += "$(Gerar-Cpf $n);Cliente $n;c$n@example.com;Rua A;$n;Centro;Campinas;SP;13010000" }
+[IO.File]::WriteAllText($dadosPaginas, (($linhasCsv -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
+Rodar 'Paginação: avançar, limites e voltar' @('admin','admin','3','/+','/+','/-','/-','','5') @('Página 1 de 2','Página 2 de 2','| 16  | Cliente 16','| 20  | Cliente 20','Esta já é a última página','Esta já é a primeira página','Exibindo 20 de 20') @() $dadosPaginas
+Verificar 'Primeira página mostra só 15 clientes' (($script:ultimaSaida -split 'Página 1 de 2')[0] -like '*| 15  | Cliente 15*' -and ($script:ultimaSaida -split 'Página 1 de 2')[0] -notlike '*| 16  |*')
+Rodar 'Paginação: filtro volta para a página 1' @('admin','admin','3','/+','cliente 1','','5') @('Página 2 de 2','Filtro: "cliente 1"','Exibindo 11 de 20') @() $dadosPaginas
+Remove-Item $dadosPaginas -ErrorAction SilentlyContinue
 
 # --- Alteração -------------------------------------------------------------
 $antes = Get-Content $dados -Encoding UTF8

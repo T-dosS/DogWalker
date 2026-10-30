@@ -55,6 +55,7 @@ typedef struct {
 /** Retornos especiais de ui_menu(). */
 #define UI_MENU_FIM  (-1) /**< a entrada terminou (Ctrl+Z / Ctrl+D)   */
 #define UI_MENU_SAIR (-2) /**< o usuário apertou Esc                  */
+#define UI_MENU_AJUDA (-3) /**< o usuário pediu ajuda com '?'         */
 
 /** Detecta o modo (rico ou simples). Chamar uma vez, no início do programa. */
 void ui_iniciar(void);
@@ -105,7 +106,10 @@ void ui_tabela_linha(const char *const celulas[], const size_t larguras[],
  *
  * @param status       linha de status exibida abaixo do cabeçalho (ou NULL).
  * @param selecionado  posição inicial do destaque; recebe a última posição.
- * @return índice da opção, UI_MENU_SAIR (Esc) ou UI_MENU_FIM (fim da entrada).
+ * Em ambos os modos, '?' devolve UI_MENU_AJUDA.
+ *
+ * @return índice da opção, UI_MENU_SAIR (Esc), UI_MENU_AJUDA ('?') ou
+ *         UI_MENU_FIM (fim da entrada).
  */
 int ui_menu(const char *titulo, const char *status, const UiItemMenu itens[],
             int quantidade, int *selecionado);
@@ -118,5 +122,8 @@ int ui_confirmar(const char *pergunta);
 
 /** Espera o usuário apertar ENTER antes de voltar ao menu. */
 void ui_pausar(void);
+
+/** Mostra a mensagem e espera o usuário apertar ENTER (ex.: "voltar à lista"). */
+void ui_aguardar_enter(const char *aviso);
 
 #endif /* UI_H */

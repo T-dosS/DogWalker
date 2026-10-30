@@ -406,7 +406,7 @@ static void desenhar_menu(const char *titulo, const char *status,
            itens[atual].descricao, ui_codigo(UI_COR_NORMAL));
     printf("\n  %s", ui_codigo(UI_COR_SUAVE));
     repetir(bordas()->horizontal, UI_LARGURA - 2);
-    printf("\n  ↑↓ navegar   Enter selecionar   1-%d ou letra: atalho   Esc sair%s\n",
+    printf("\n  ↑↓ navegar   Enter selecionar   1-%d ou letra: atalho   ? ajuda   Esc sair%s\n",
            quantidade, ui_codigo(UI_COR_NORMAL));
 }
 
@@ -444,6 +444,11 @@ static int menu_interativo(const char *titulo, const char *status,
             decidido = 1;
             break;
         case TECLA_NAV_CARACTERE:
+            if (caractere == '?') {
+                escolha = UI_MENU_AJUDA;
+                decidido = 1;
+                break;
+            }
             indice = item_por_tecla(itens, quantidade, caractere);
             if (indice >= 0) {
                 atual = indice;
@@ -475,6 +480,7 @@ static int menu_por_linha(const char *titulo, const char *status,
         escrever_alinhado(itens[i].texto, 30);
         printf(" (%c)\n", itens[i].letra);
     }
+    printf("  [?] Ajuda\n");
 
     for (;;) {
         ResultadoEntrada leitura =
@@ -482,6 +488,9 @@ static int menu_por_linha(const char *titulo, const char *status,
 
         if (leitura == ENTRADA_FIM) {
             return UI_MENU_FIM;
+        }
+        if (leitura == ENTRADA_OK && strcmp(entrada, "?") == 0) {
+            return UI_MENU_AJUDA;
         }
         if (leitura == ENTRADA_OK && strlen(entrada) == 1) {
             int indice = item_por_tecla(itens, quantidade, entrada[0]);
@@ -544,7 +553,7 @@ int ui_confirmar(const char *pergunta)
     }
 }
 
-void ui_pausar(void)
+void ui_aguardar_enter(const char *aviso)
 {
     char rotulo[TAM_ENTRADA];
     char descarte[TAM_ENTRADA];
@@ -552,7 +561,12 @@ void ui_pausar(void)
     if (entrada_encerrada()) {
         return;
     }
-    snprintf(rotulo, sizeof rotulo, "\n  %sPressione ENTER para voltar ao menu...%s",
-             ui_codigo(UI_COR_SUAVE), ui_codigo(UI_COR_NORMAL));
+    snprintf(rotulo, sizeof rotulo, "\n  %s%s%s", ui_codigo(UI_COR_SUAVE), aviso,
+             ui_codigo(UI_COR_NORMAL));
     (void)ler_linha(rotulo, descarte, sizeof descarte);
+}
+
+void ui_pausar(void)
+{
+    ui_aguardar_enter("Pressione ENTER para voltar ao menu...");
 }

@@ -18,6 +18,7 @@
 #include "menu.h"
 #include "arquivo.h"
 #include "cliente.h"
+#include "exportar.h"
 #include "terminal.h"
 #include "ui.h"
 #include "validacao.h"
@@ -54,6 +55,10 @@ typedef void (*Operacao)(ListaClientes *lista, const char *caminho);
 #define DICA_EMAIL "E-mail inválido. Exemplo de formato aceito: nome@dominio.com"
 #define DICA_UF    "Estado inválido. Use a sigla da UF com 2 letras (ex.: SP, RJ, MG)."
 #define DICA_CEP   "CEP inválido. Digite 8 dígitos, com ou sem hífen (ex.: 01001-000)."
+
+/* Quantos clientes cabem em uma página da listagem: com cabeçalho, status
+ * e prompt, a tela inteira fica em cerca de 30 linhas. */
+#define CLIENTES_POR_PAGINA 15
 
 /* Colunas da tabela de clientes: #, Nome, CPF, Cidade/UF. */
 #define COLUNAS_TABELA 4
@@ -323,33 +328,58 @@ static void cadastrar_cliente(ListaClientes *lista, const char *caminho)
 }
 
 /**
- * Desenha a tabela com os clientes que correspondem ao filtro, na ordem da
- * `visao` (ou na ordem de cadastro, se ela for NULL). A coluna "#" mostra
- * sempre a posição do cliente na lista completa, qualquer que seja a ordem.
+ * Monta a seleção que a listagem mostra: os clientes que correspondem ao
+ * filtro, na ordem da `visao` (ou na de cadastro, se ela for NULL). A
+ * mesma seleção alimenta a tabela, a paginação e as exportações, então o
+ * que é exportado é exatamente o que o usuário está vendo.
  *
- * @return quantos clientes foram exibidos.
+ * @param quantidade recebe quantos clientes foram selecionados.
+ * @return vetor de ponteiros (liberar com free()) ou NULL se faltar memória.
  */
-static size_t exibir_tabela_clientes(const ListaClientes *lista, const Cliente *const *visao,
-                                     const char *filtro)
+static const Cliente **selecionar_clientes(const ListaClientes *lista,
+                                           const Cliente *const *visao,
+                                           const char *filtro, size_t *quantidade)
+{
+    const Cliente **selecao;
+    size_t i;
+
+    *quantidade = 0;
+    /* +1 evita malloc(0), cujo resultado varia entre implementações. */
+    selecao = malloc((lista->quantidade + 1) * sizeof *selecao);
+    if (selecao == NULL) {
+        return NULL;
+    }
+    for (i = 0; i < lista->quantidade; i++) {
+        const Cliente *c = (visao != NULL) ? visao[i] : &lista->itens[i];
+        if (cliente_corresponde(c, filtro)) {
+            selecao[(*quantidade)++] = c;
+        }
+    }
+    return selecao;
+}
+
+/**
+ * Desenha a tabela com os clientes selecao[inicio .. fim-1]. A coluna "#"
+ * mostra sempre a posição do cliente na lista completa (a de cadastro),
+ * qualquer que seja a ordem, o filtro ou a página.
+ */
+static void exibir_tabela_clientes(const ListaClientes *lista, const Cliente *const *selecao,
+                                   size_t inicio, size_t fim)
 {
     static const char *const TITULOS[COLUNAS_TABELA] = {"#", "Nome", "CPF", "Cidade/UF"};
-    size_t exibidos = 0;
     size_t i;
 
     ui_tabela_topo(LARGURAS_TABELA, COLUNAS_TABELA);
     ui_tabela_linha(TITULOS, LARGURAS_TABELA, COLUNAS_TABELA, UI_COR_TITULO);
     ui_tabela_divisoria(LARGURAS_TABELA, COLUNAS_TABELA);
 
-    for (i = 0; i < lista->quantidade; i++) {
-        const Cliente *c = (visao != NULL) ? visao[i] : &lista->itens[i];
+    for (i = inicio; i < fim; i++) {
+        const Cliente *c = selecao[i];
         char posicao[12];
         char cpf[TAM_CPF_FORMATADO];
         char cidade_uf[TAM_CIDADE + TAM_ESTADO + 1];
         const char *celulas[COLUNAS_TABELA];
 
-        if (!cliente_corresponde(c, filtro)) {
-            continue;
-        }
         snprintf(posicao, sizeof posicao, "%u", (unsigned)(c - lista->itens + 1));
         formatar_cpf(c->cpf, cpf, sizeof cpf);
         snprintf(cidade_uf, sizeof cidade_uf, "%s/%s", c->cidade, c->estado);
@@ -359,11 +389,9 @@ static size_t exibir_tabela_clientes(const ListaClientes *lista, const Cliente *
         celulas[2] = cpf;
         celulas[3] = cidade_uf;
         ui_tabela_linha(celulas, LARGURAS_TABELA, COLUNAS_TABELA, UI_COR_NORMAL);
-        exibidos++;
     }
 
     ui_tabela_base(LARGURAS_TABELA, COLUNAS_TABELA);
-    return exibidos;
 }
 
 /**
@@ -410,9 +438,107 @@ static const char *descrever_ordem(OrdemListagem ordem)
 }
 
 /**
- * Listagem em tabela com filtro e ordenação. A própria pergunta do filtro
- * faz o papel da pausa: ENTER vazio volta ao menu; um termo refaz a tabela
- * filtrada; "/n", "/c" e "/o" mudam a ordem e mantêm o filtro atual.
+ * Tela de ajuda com todos os atalhos. Usada pelo menu e pela listagem.
+ * @param voltar_para texto do aviso final (ex.: "voltar ao menu").
+ */
+static void mostrar_ajuda(const char *voltar_para)
+{
+    char mensagem[TAM_ENTRADA];
+    const char *r = ui_codigo(UI_COR_ROTULO);
+    const char *n = ui_codigo(UI_COR_NORMAL);
+
+    ui_cabecalho("AJUDA");
+    printf("\n  %sMenu principal%s\n", ui_codigo(UI_COR_TITULO), n);
+    printf("    %s↑ ↓%s        move o destaque         %sEnter%s    abre a opção\n", r, n, r, n);
+    printf("    %s1 a 5%s      abre a opção direto     %sC A L R S%s  iniciais das opções\n",
+           r, n, r, n);
+    printf("    %s?%s          esta ajuda              %sEsc%s      encerra o programa\n",
+           r, n, r, n);
+
+    printf("\n  %sListagem de clientes%s (digite e tecle Enter)\n", ui_codigo(UI_COR_TITULO), n);
+    printf("    %stexto%s      filtra por nome, cidade, UF, e-mail ou CPF (sem acentos)\n", r, n);
+    printf("    %s/n /c /o%s   ordena por nome, por cidade ou pela ordem de cadastro\n", r, n);
+    printf("    %s/+ /-%s      próxima página / página anterior (%u por página)\n", r, n,
+           (unsigned)CLIENTES_POR_PAGINA);
+    printf("    %s#3%s         abre a ficha completa do cliente nº 3\n", r, n);
+    printf("    %s/e%s         exporta o que está na tela para %s (HTML)\n", r, n,
+           EXPORTAR_NOME_HTML);
+    printf("    %s/x%s         exporta o que está na tela para %s (planilha)\n", r, n,
+           EXPORTAR_NOME_CSV);
+    printf("    %sEnter%s      volta ao menu\n", r, n);
+
+    printf("\n  %sDicas%s\n", ui_codigo(UI_COR_TITULO), n);
+    printf("    Na alteração, Enter mantém o valor atual de cada campo.\n");
+    printf("    Ctrl+Z (Windows) ou Ctrl+D (Linux/macOS) encerra a qualquer momento.\n");
+    printf("    NO_COLOR=1 ou DOGWALKER_SIMPLES=1 desligam cores e bordas.\n");
+
+    snprintf(mensagem, sizeof mensagem, "Pressione ENTER para %s...", voltar_para);
+    ui_aguardar_enter(mensagem);
+}
+
+/** Mostra a ficha completa de um cliente e espera o ENTER para voltar. */
+static void mostrar_ficha(const ListaClientes *lista, size_t indice)
+{
+    ui_cabecalho("FICHA DO CLIENTE");
+    printf("\n");
+    ui_info("Cliente nº %u de %u", (unsigned)(indice + 1), (unsigned)lista->quantidade);
+    printf("\n");
+    cliente_exibir(&lista->itens[indice]);
+    ui_aguardar_enter("Pressione ENTER para voltar à lista...");
+}
+
+/** Descrição do recorte atual, usada na legenda do relatório HTML. */
+static void descrever_recorte(const char *filtro, OrdemListagem ordem, char *saida,
+                              size_t tamanho)
+{
+    if (filtro[0] != '\0') {
+        snprintf(saida, tamanho, "Clientes com \"%s\", ordenados por %s", filtro,
+                 descrever_ordem(ordem));
+    } else {
+        snprintf(saida, tamanho, "Todos os clientes, ordenados por %s", descrever_ordem(ordem));
+    }
+}
+
+/**
+ * Executa a exportação pedida na listagem (/e ou /x) e escreve o resultado
+ * em `mensagem`. @return 1 se deu certo, 0 se falhou.
+ */
+static int exportar_selecao(char tipo, const char *caminho_dados, const ListaClientes *lista,
+                            const Cliente *const *selecao, size_t quantidade,
+                            const char *filtro, OrdemListagem ordem,
+                            char *mensagem, size_t tamanho)
+{
+    char destino[FILENAME_MAX];
+    const char *nome = (tipo == 'e') ? EXPORTAR_NOME_HTML : EXPORTAR_NOME_CSV;
+    ResultadoArquivo resultado;
+
+    if (!exportar_caminho_vizinho(caminho_dados, nome, destino, sizeof destino)) {
+        snprintf(mensagem, tamanho, "Caminho de exportação longo demais.");
+        return 0;
+    }
+    if (tipo == 'e') {
+        char descricao[TAM_ENTRADA + 64];
+        descrever_recorte(filtro, ordem, descricao, sizeof descricao);
+        resultado = exportar_html(destino, lista, selecao, quantidade, descricao);
+    } else {
+        resultado = exportar_csv(destino, selecao, quantidade);
+    }
+
+    if (resultado != ARQUIVO_OK) {
+        snprintf(mensagem, tamanho, "Não foi possível gravar '%s'.", destino);
+        return 0;
+    }
+    snprintf(mensagem, tamanho, "%s com %u cliente(s): %s",
+             (tipo == 'e') ? "Relatório gerado" : "Planilha gerada", (unsigned)quantidade,
+             destino);
+    return 1;
+}
+
+/**
+ * Listagem em tabela com filtro, ordenação, paginação, ficha e exportação.
+ * A própria pergunta da listagem faz o papel da pausa: ENTER vazio volta
+ * ao menu; um texto filtra; comandos começando com '/' ou '#' agem sobre a
+ * seleção atual (veja mostrar_ajuda para a lista completa).
  */
 /* A assinatura segue o tipo Operacao (lista não constante) para servir de
  * callback em executar_operacao, embora a listagem só leia a lista. */
@@ -422,12 +548,17 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
     char filtro[TAM_ENTRADA] = "";
     char entrada[TAM_ENTRADA];
     char rotulo[TAM_ENTRADA];
-    const char *aviso = NULL; /* mostrado depois da tabela redesenhada */
+    /* Mensagens mostradas depois que a tela é redesenhada. */
+    char sucesso[TAM_ENTRADA + FILENAME_MAX] = "";
+    char falha[TAM_ENTRADA + FILENAME_MAX] = "";
+    const char *aviso = NULL;
     OrdemListagem ordem = ORDEM_CADASTRO;
     const Cliente **visao = NULL;
+    const Cliente **selecao = NULL;
+    size_t selecionados = 0;
+    size_t pagina = 0;
+    int refazer_selecao = 1;
     int primeira_vez = 1;
-
-    (void)caminho; /* a listagem não grava nada */
 
     if (lista->quantidade == 0) {
         printf("\n");
@@ -437,17 +568,39 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
     }
 
     snprintf(rotulo, sizeof rotulo,
-             "\n  %sFiltrar%s por nome, cidade, UF, CPF ou e-mail %s(ENTER para voltar)%s: ",
+             "\n  %sFiltrar%s ou comando %s(? ajuda, ENTER volta ao menu)%s: ",
              ui_codigo(UI_COR_ROTULO), ui_codigo(UI_COR_NORMAL), ui_codigo(UI_COR_SUAVE),
              ui_codigo(UI_COR_NORMAL));
 
     for (;;) {
-        size_t exibidos;
         ResultadoEntrada leitura;
         OrdemListagem nova_ordem;
+        size_t paginas;
+        size_t inicio;
+        size_t fim;
+
+        if (refazer_selecao) {
+            free(selecao);
+            selecao = selecionar_clientes(lista, visao, filtro, &selecionados);
+            if (selecao == NULL) {
+                printf("\n");
+                ui_erro("Memória insuficiente para montar a listagem.");
+                ui_pausar();
+                break;
+            }
+            pagina = 0;
+            refazer_selecao = 0;
+        }
+        paginas = (selecionados + CLIENTES_POR_PAGINA - 1) / CLIENTES_POR_PAGINA;
+        if (paginas == 0) {
+            paginas = 1;
+        }
+        inicio = pagina * CLIENTES_POR_PAGINA;
+        fim = (inicio + CLIENTES_POR_PAGINA < selecionados) ? inicio + CLIENTES_POR_PAGINA
+                                                             : selecionados;
 
         if (!primeira_vez) {
-            ui_cabecalho("LISTA DE CLIENTES"); /* redesenha a tela já filtrada */
+            ui_cabecalho("LISTA DE CLIENTES"); /* redesenha a tela já atualizada */
         }
         primeira_vez = 0;
 
@@ -458,19 +611,31 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
         if (ordem != ORDEM_CADASTRO) {
             ui_info("Ordenado por %s.", descrever_ordem(ordem));
         }
-        exibidos = exibir_tabela_clientes(lista, visao, filtro);
+        exibir_tabela_clientes(lista, selecao, inicio, fim);
 
-        if (exibidos == 0) {
+        if (selecionados == 0) {
             ui_aviso("Nenhum cliente corresponde ao filtro.");
         }
         if (aviso != NULL) {
             ui_aviso("%s", aviso);
             aviso = NULL;
         }
-        printf("  %sExibindo %u de %u.%s Total: %u cliente(s) cadastrado(s).\n",
-               ui_codigo(UI_COR_SUAVE), (unsigned)exibidos, (unsigned)lista->quantidade,
+        if (sucesso[0] != '\0') {
+            ui_sucesso("%s", sucesso);
+            sucesso[0] = '\0';
+        }
+        if (falha[0] != '\0') {
+            ui_erro("%s", falha);
+            falha[0] = '\0';
+        }
+        printf("  %sExibindo %u de %u.%s Total: %u cliente(s) cadastrado(s).",
+               ui_codigo(UI_COR_SUAVE), (unsigned)selecionados, (unsigned)lista->quantidade,
                ui_codigo(UI_COR_NORMAL), (unsigned)lista->quantidade);
-        printf("  %sOrdenar: /n nome   /c cidade   /o ordem de cadastro%s\n",
+        if (paginas > 1) {
+            printf("  %sPágina %u de %u.%s", ui_codigo(UI_COR_TITULO), (unsigned)(pagina + 1),
+                   (unsigned)paginas, ui_codigo(UI_COR_NORMAL));
+        }
+        printf("\n  %s/n /c /o ordem   /+ /- página   #nº ficha   /e HTML   /x planilha%s\n",
                ui_codigo(UI_COR_SUAVE), ui_codigo(UI_COR_NORMAL));
 
         leitura = ler_linha(rotulo, entrada, sizeof entrada);
@@ -479,6 +644,8 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
         }
         if (leitura == ENTRADA_LONGA) {
             aviso = "Texto muito longo. O filtro anterior foi mantido.";
+        } else if (strcmp(entrada, "?") == 0) {
+            mostrar_ajuda("voltar à lista");
         } else if (ler_comando_ordem(entrada, &nova_ordem)) {
             /* A lista não muda durante a listagem: basta recriar a visão
              * quando a ordem muda. */
@@ -492,12 +659,42 @@ static void listar_clientes(ListaClientes *lista, const char *caminho)
                     aviso = "Memória insuficiente para ordenar. Exibindo na ordem de cadastro.";
                 }
             }
+            refazer_selecao = 1;
+        } else if (strcmp(entrada, "/+") == 0) {
+            if (pagina + 1 < paginas) {
+                pagina++;
+            } else {
+                aviso = "Esta já é a última página.";
+            }
+        } else if (strcmp(entrada, "/-") == 0) {
+            if (pagina > 0) {
+                pagina--;
+            } else {
+                aviso = "Esta já é a primeira página.";
+            }
+        } else if (strcmp(entrada, "/e") == 0 || strcmp(entrada, "/E") == 0
+                   || strcmp(entrada, "/x") == 0 || strcmp(entrada, "/X") == 0) {
+            char tipo = (char)((entrada[1] == 'e' || entrada[1] == 'E') ? 'e' : 'x');
+            char resultado[TAM_ENTRADA + FILENAME_MAX];
+            int exportou = exportar_selecao(tipo, caminho, lista, selecao, selecionados,
+                                            filtro, ordem, resultado, sizeof resultado);
+            snprintf(exportou ? sucesso : falha, sizeof sucesso, "%s", resultado);
+        } else if (entrada[0] == '#') {
+            int numero;
+            if (converter_inteiro(entrada + 1, &numero) && numero >= 1
+                && (size_t)numero <= lista->quantidade) {
+                mostrar_ficha(lista, (size_t)numero - 1);
+            } else {
+                aviso = "Número de cliente inválido. Use o número da coluna #, ex.: #3.";
+            }
         } else if (entrada[0] == '/') {
-            aviso = "Comando desconhecido. Use /n, /c ou /o para ordenar.";
+            aviso = "Comando desconhecido. Digite ? para ver todos os comandos.";
         } else {
             snprintf(filtro, sizeof filtro, "%s", entrada);
+            refazer_selecao = 1;
         }
     }
+    free(selecao);
     free(visao);
 }
 
@@ -658,6 +855,10 @@ void menu_executar(const char *caminho_arquivo, const char *usuario)
         if (escolha == UI_MENU_SAIR || escolha == OPCAO_ENCERRAR) {
             printf("\n  Fim da execução. Até logo!\n");
             return;
+        }
+        if (escolha == UI_MENU_AJUDA) {
+            mostrar_ajuda("voltar ao menu"); /* tem a própria pausa */
+            continue;
         }
 
         switch (escolha) {
