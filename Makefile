@@ -4,7 +4,8 @@
 #   make           compila o programa
 #   make run       compila (se necessário) e executa
 #   make test      compila e executa os testes automatizados
-#   make cenarios  testes de uso ponta a ponta (Windows, PowerShell)
+#   make cenarios  testes de uso ponta a ponta (PowerShell no Windows,
+#                  sh no Linux/macOS)
 #   make lint      análise estática com cppcheck
 #   make bench     mede o tempo de gravar e carregar muitos clientes
 #   make check     tudo antes de publicar: build rigoroso, testes e lint
@@ -41,7 +42,7 @@ else
     RM       = rm -f
     RUN      = ./
     MKDATA   = mkdir -p data
-    CENARIOS = @echo "cenarios: disponíveis apenas no Windows (PowerShell)"
+    CENARIOS = sh tests/cenarios.sh ./$(BIN)
 endif
 
 BIN       = dogwalker$(EXE)

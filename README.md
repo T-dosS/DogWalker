@@ -193,7 +193,8 @@ DogWalker/
 │   └── login.c              # autenticação com 3 tentativas
 ├── tests/
 │   ├── test_dogwalker.c     # 1337 verificações unitárias (make test)
-│   ├── cenarios.ps1         # 49 cenários ponta a ponta (make cenarios)
+│   ├── cenarios.ps1         # 49 cenários ponta a ponta no Windows (make cenarios)
+│   ├── cenarios.sh          # 24 cenários ponta a ponta em shell POSIX (Linux, macOS, Git Bash)
 │   └── benchmark.c          # medição de desempenho (make bench)
 ├── data/clientes_exemplo.csv # dados FICTÍCIOS
 ├── docs/
@@ -216,7 +217,7 @@ DogWalker/
 | Comando | O que valida | Resultado atual |
 |---------|--------------|-----------------|
 | `make test` | Regras de negócio, persistência, filtro, ordenação, exportação (escape HTML, fórmulas, máscara), UTF-8 | **1337 verificações, 0 falhas** |
-| `make cenarios` | 49 usos completos com o programa real: login, cadastro com erros, filtro, ordenação, paginação, ficha, ajuda, exportações (conferindo o conteúdo dos arquivos), alteração e remoção (conferindo que só o cliente escolhido mudou), arquivo vazio/corrompido, pasta inexistente | **49 cenários, 0 falhas** (Windows) |
+| `make cenarios` | Usos completos com o programa real: login, cadastro com erros, filtro, ordenação, paginação, ficha, ajuda, exportações (conferindo o conteúdo dos arquivos), alteração e remoção (conferindo que só o cliente escolhido mudou), arquivo vazio/corrompido, pasta inexistente | **Windows:** 49 cenários (PowerShell), 0 falhas · **Linux/macOS:** 24 cenários (`sh`), 0 falhas no Git Bash |
 | `make bench` | Tempo de gravar e carregar 1.000, 10.000 e 50.000 clientes | 50.000 carregados em ~0,04 s |
 | `make check` | Tudo antes de publicar: build rigoroso com `-Werror`, testes, cppcheck e cenários | ✅ |
 

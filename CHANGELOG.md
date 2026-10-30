@@ -33,6 +33,8 @@ Upgrade de desempenho, funcionalidades, qualidade e segurança. Auditoria comple
 - Workflow do GitHub Actions pronto em `docs/ci/ci.yml` (Linux com sanitizers e Windows).
 - `docs/AUDITORIA.md` e `docs/AVALIACAO_TECNOLOGIAS.md`; novas capturas de tela no README.
 - Testes: 1337 verificações (antes 1244) e 49 cenários ponta a ponta (antes 28).
+- `tests/cenarios.sh`: 24 cenários ponta a ponta em shell POSIX, para Linux, macOS, Git Bash e a CI
+  (`make cenarios` fora do Windows).
 
 ### Alterado
 - **Desempenho:** a carga do CSV passou de quadrática para linear (índice de CPFs em tabela hash).

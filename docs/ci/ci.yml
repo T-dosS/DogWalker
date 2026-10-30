@@ -6,8 +6,8 @@
 #   2. copie este arquivo para .github/workflows/ci.yml e faça o commit
 #
 # O que roda em cada push e Pull Request para a main:
-#   - Linux:   build rigoroso (-Werror), testes, cppcheck e testes com
-#              AddressSanitizer + UndefinedBehaviorSanitizer
+#   - Linux:   build rigoroso (-Werror), testes, cppcheck, cenários ponta a
+#              ponta (tests/cenarios.sh) e testes com AddressSanitizer + UBSan
 #   - Windows: build com MinGW, testes unitários e os cenários ponta a ponta
 name: CI
 
@@ -38,6 +38,9 @@ jobs:
 
       - name: Análise estática
         run: make lint
+
+      - name: Cenários ponta a ponta (sh)
+        run: make && make cenarios
 
       - name: Testes com AddressSanitizer e UBSan
         run: |
