@@ -222,19 +222,24 @@ const Cliente **lista_criar_visao(const ListaClientes *lista, OrdemListagem orde
 
 void cliente_exibir(const Cliente *cliente)
 {
-    const char *rotulo = ui_codigo(UI_COR_ROTULO);
-    const char *normal = ui_codigo(UI_COR_NORMAL);
     char cpf[TAM_CPF_FORMATADO];
     char cep[TAM_CEP_FORMATADO];
+    char endereco[TAM_RUA + TAM_NUMERO + TAM_BAIRRO + 8];
+    char cidade_uf[TAM_CIDADE + TAM_ESTADO + 2];
 
     formatar_cpf(cliente->cpf, cpf, sizeof cpf);
     formatar_cep(cliente->cep, cep, sizeof cep);
+    snprintf(endereco, sizeof endereco, "%s, %s - %s", cliente->rua, cliente->numero,
+             cliente->bairro);
+    snprintf(cidade_uf, sizeof cidade_uf, "%s/%s", cliente->cidade, cliente->estado);
 
-    printf("  %sNome ......:%s %s\n", rotulo, normal, cliente->nome);
-    printf("  %sCPF .......:%s %s\n", rotulo, normal, cpf);
-    printf("  %sE-mail ....:%s %s\n", rotulo, normal, cliente->email);
-    printf("  %sEndereço ..:%s %s, %s - %s\n", rotulo, normal, cliente->rua,
-           cliente->numero, cliente->bairro);
-    printf("  %sCidade/UF .:%s %s/%s\n", rotulo, normal, cliente->cidade, cliente->estado);
-    printf("  %sCEP .......:%s %s\n", rotulo, normal, cep);
+    /* Cartão com borda; valores longos quebram dentro dele (ui_painel_campo). */
+    ui_painel_inicio("Dados do cliente");
+    ui_painel_campo("Nome", cliente->nome);
+    ui_painel_campo("CPF", cpf);
+    ui_painel_campo("E-mail", cliente->email);
+    ui_painel_campo("Endereço", endereco);
+    ui_painel_campo("Cidade/UF", cidade_uf);
+    ui_painel_campo("CEP", cep);
+    ui_painel_fim();
 }

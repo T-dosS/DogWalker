@@ -776,6 +776,8 @@ static void remover_cliente(ListaClientes *lista, const char *caminho)
         return;
     }
 
+    printf("\n");
+    ui_aviso("A remoção é definitiva: os dados deste cliente serão apagados do arquivo.");
     if (ui_confirmar("\n  Tem certeza de que deseja remover este cliente?") != 1) {
         printf("\n");
         ui_aviso("Remoção cancelada. Nenhum dado foi alterado.");

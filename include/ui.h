@@ -90,6 +90,15 @@ size_t ui_largura_texto(const char *texto);
  */
 void ui_truncar(const char *texto, size_t largura, char *saida, size_t tamanho);
 
+/*
+ * Painel (cartão com borda) de pares rótulo/valor, usado na ficha do cliente.
+ * Valores longos quebram em várias linhas dentro do cartão, preferindo os
+ * espaços entre palavras; nada é cortado.
+ */
+void ui_painel_inicio(const char *titulo);
+void ui_painel_campo(const char *rotulo, const char *valor);
+void ui_painel_fim(void);
+
 /* Tabelas: desenham bordas e células alinhadas às larguras informadas. */
 void ui_tabela_topo(const size_t larguras[], size_t colunas);
 void ui_tabela_divisoria(const size_t larguras[], size_t colunas);
