@@ -417,6 +417,76 @@ static void testar_muitos_clientes(void)
     lista_liberar(&lida);
 }
 
+/*
+ * A detecção de CPF duplicado na carga usa uma tabela hash que cresce
+ * conforme a ocupação. Com 3.000 clientes ela cresce algumas vezes; as
+ * repetições ficam no fim do arquivo, depois dos crescimentos.
+ */
+static void testar_duplicados_em_massa(void)
+{
+    ListaClientes lista;
+    ListaClientes lida;
+    size_t ignoradas = 0;
+    int i;
+
+    lista_iniciar(&lista);
+    lista_iniciar(&lida);
+    for (i = 1; i <= 3000; i++) {
+        char nome[TAM_NOME];
+        char cpf[TAM_CPF];
+        Cliente c;
+
+        gerar_cpf(i, cpf);
+        snprintf(nome, sizeof nome, "Cliente %d", i);
+        c = criar_cliente(cpf, nome);
+        lista_adicionar(&lista, &c);
+    }
+    /* 100 repetições dos primeiros CPFs, com outro nome */
+    for (i = 1; i <= 100; i++) {
+        char cpf[TAM_CPF];
+        Cliente c;
+
+        gerar_cpf(i, cpf);
+        c = criar_cliente(cpf, "Repetido");
+        lista_adicionar(&lista, &c);
+    }
+
+    VERIFICAR(arquivo_salvar(ARQ_TESTE, &lista) == ARQUIVO_OK);
+    VERIFICAR(arquivo_carregar(ARQ_TESTE, &lida, &ignoradas) == ARQUIVO_OK);
+    VERIFICAR(lida.quantidade == 3000);
+    VERIFICAR(ignoradas == 100);
+    /* vale a primeira ocorrência e a ordem do arquivo é mantida */
+    VERIFICAR(lida.quantidade == 3000 && strcmp(lida.itens[0].nome, "Cliente 1") == 0);
+    VERIFICAR(lida.quantidade == 3000 && strcmp(lida.itens[2999].nome, "Cliente 3000") == 0);
+    {
+        int repetido_carregado = 0;
+        for (i = 0; i < (int)lida.quantidade; i++) {
+            if (strcmp(lida.itens[i].nome, "Repetido") == 0) {
+                repetido_carregado = 1;
+            }
+        }
+        VERIFICAR(!repetido_carregado);
+    }
+
+    /* clientes já presentes na lista também contam como vistos */
+    lista_liberar(&lida);
+    lista_iniciar(&lida);
+    {
+        char cpf[TAM_CPF];
+        Cliente c;
+        gerar_cpf(1, cpf);
+        c = criar_cliente(cpf, "Já na lista");
+        lista_adicionar(&lida, &c);
+    }
+    VERIFICAR(arquivo_carregar(ARQ_TESTE, &lida, &ignoradas) == ARQUIVO_OK);
+    VERIFICAR(lida.quantidade == 3000);
+    VERIFICAR(ignoradas == 101);
+    VERIFICAR(strcmp(lida.itens[0].nome, "Já na lista") == 0);
+
+    lista_liberar(&lista);
+    lista_liberar(&lida);
+}
+
 /* ------------------------------------------------------------------ */
 /* Filtro da listagem e alinhamento da interface                       */
 /* ------------------------------------------------------------------ */
@@ -583,6 +653,7 @@ int main(void)
         {"Arquivo com BOM UTF-8 e quebras CRLF", testar_crlf_e_bom},
         {"Gravação em pasta inexistente retorna erro", testar_pasta_inexistente},
         {"500 clientes: gravação e leitura", testar_muitos_clientes},
+        {"3.000 clientes com CPFs repetidos: carga descarta só os repetidos", testar_duplicados_em_massa},
         {"Filtro da listagem: nome, cidade, UF, e-mail, CPF e acentos", testar_filtro},
         {"Texto para comparação: minúsculas, sem acentos e UTF-8 seguro", testar_texto_para_comparacao},
         {"Ordenação da listagem por nome e cidade", testar_ordenacao},
@@ -595,6 +666,9 @@ int main(void)
     for (i = 0; i < sizeof casos / sizeof casos[0]; i++) {
         int falhas_antes = total_falhas;
         casos[i].executar();
+        /* casos[i].executar() altera total_falhas (variável global); o
+         * cppcheck não acompanha a chamada por ponteiro de função. */
+        // cppcheck-suppress knownConditionTrueFalse
         printf("  [%s] %s\n", total_falhas == falhas_antes ? " OK " : "FALHA", casos[i].nome);
     }
 
