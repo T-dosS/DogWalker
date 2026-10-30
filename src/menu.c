@@ -449,10 +449,10 @@ static void mostrar_ajuda(const char *voltar_para)
 
     ui_cabecalho("AJUDA");
     printf("\n  %sMenu principal%s\n", ui_codigo(UI_COR_TITULO), n);
-    printf("    %s↑ ↓%s        move o destaque         %sEnter%s    abre a opção\n", r, n, r, n);
+    printf("    %s↑ ↓%s        move o destaque         %sEnter%s      abre a opção\n", r, n, r, n);
     printf("    %s1 a 5%s      abre a opção direto     %sC A L R S%s  iniciais das opções\n",
            r, n, r, n);
-    printf("    %s?%s          esta ajuda              %sEsc%s      encerra o programa\n",
+    printf("    %s?%s          esta ajuda              %sEsc%s        encerra o programa\n",
            r, n, r, n);
 
     printf("\n  %sListagem de clientes%s (digite e tecle Enter)\n", ui_codigo(UI_COR_TITULO), n);
