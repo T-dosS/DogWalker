@@ -8,7 +8,8 @@ main.c ─► login.c ─┐
    └────► menu.c ──┘
               │
               ├─► cliente.c ─► validacao.c
-              └─► arquivo.c
+              ├─► arquivo.c
+              └─► exportar.c (relatório HTML e planilha)
 ```
 
 | Módulo | Responsabilidade | Por que separado |
@@ -19,6 +20,7 @@ main.c ─► login.c ─┐
 | `cliente.c` | `struct Cliente` e a lista dinâmica | Não usa teclado nem arquivo, então pode ser testado sozinho |
 | `validacao.c` | Regras de cada campo (CPF, e-mail, UF, CEP, texto) | Regras de negócio puras, 100% testáveis |
 | `arquivo.c` | Ler/gravar CSV | Trocar o formato (ex.: binário/SQLite) só altera este arquivo |
+| `exportar.c` | Relatório HTML5/CSS3 e planilha CSV | Funções puras de escape e formatação, testáveis sem a tela; o arquivo de dados nunca é tocado |
 | `terminal.c` | Leitura segura do teclado (linhas, senha, setas/Esc) | Concentra o `#ifdef _WIN32` do teclado e substitui `scanf`/`fflush(stdin)` |
 | `ui.c` | Cores ANSI, bordas Unicode, mensagens, tabelas e menu | Toda a aparência em um ponto; modo simples automático. Veja [INTERFACE.md](INTERFACE.md) |
 
@@ -57,6 +59,14 @@ Toda operação segue o mesmo ciclo (`executar_operacao` em `menu.c`):
 não é possível "editar a linha 3 no lugar" se o novo nome for maior.
 Regravar é simples, correto e rápido para milhares de registros.
 
+**Carga em tempo linear (2.0):** na leitura, cada CPF precisa ser comparado aos já lidos
+para descartar duplicados. Com busca linear isso custava O(n²): 50 mil clientes levavam 3,1 s,
+e toda tela carrega o arquivo. Agora uma **tabela hash de endereçamento aberto** guarda os CPFs
+já vistos. Ela é simples de explicar: o CPF de 11 dígitos cabe num inteiro de 64 bits e é a
+própria chave, há sondagem linear e a tabela dobra de tamanho com 70% de ocupação. Cada
+verificação custa O(1) em média, e 50 mil clientes carregam em 0,04 s. Uma estrutura feita à mão,
+em vez de biblioteca, mantém o projeto sem dependências (medição: `make bench`).
+
 **Gravação segura:** os dados são escritos em `clientes.csv.tmp`. Só se *todas* as
 escritas e o `fclose` tiverem sucesso o `.tmp` substitui o original
 (`rename` no Linux, `MoveFileExA(..., MOVEFILE_REPLACE_EXISTING)` no Windows, onde
@@ -74,9 +84,16 @@ o arquivo original continua intacto.
 
 ### Busca por CPF
 `normalizar_cpf()` remove a máscara e valida → `lista_buscar_cpf()` percorre a
-lista comparando com `strcmp` (busca linear, O(n)). Para o volume de um pet shop
-isso é instantâneo. Com centenas de milhares de registros, a evolução natural seria
-ordenar e usar busca binária, ou usar um índice.
+lista comparando com `strcmp` (busca linear, O(n)). Para uma busca por tela, isso é
+instantâneo mesmo com dezenas de milhares de clientes. O gargalo real era a carga do arquivo,
+resolvida com o índice hash descrito na seção 3.
+
+### Exportação (2.0)
+A listagem monta uma única **seleção** (filtro + ordem) que alimenta a tabela, a paginação e as
+exportações, então o que se exporta é exatamente o que se vê. O relatório HTML não tem JavaScript
+nem recursos externos: tudo é escapado e o CSS vai embutido. A planilha é um arquivo **separado**
+com proteção contra fórmulas. Essa escolha resolveu o risco de injeção de fórmulas sem mudar o que
+o cadastro aceita e sem descartar dados já gravados.
 
 ### Alteração
 1. `localizar_cliente()`: lê o CPF, busca e exibe os dados atuais.

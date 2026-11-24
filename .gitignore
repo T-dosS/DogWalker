@@ -3,6 +3,7 @@
 # ---------------------------------------------------------------
 dogwalker
 test_dogwalker
+benchmark
 *.exe
 *.out
 *.app
@@ -42,6 +43,7 @@ Dados_Clientes.txt
 
 # Arquivos temporários criados pelos testes
 teste_tmp_*.csv
+bench_tmp_*.csv
 
 # ---------------------------------------------------------------
 # IDEs e editores
